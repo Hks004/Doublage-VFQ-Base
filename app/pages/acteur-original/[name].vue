@@ -20,13 +20,15 @@ watch(() => route.params.name, () => {
   openGroups.value = {}
 })
 
-// On récupère le catalogue global en mémoire depuis app.vue
-const allMoviesCatalog = useState('vfq_all_movies_comediens', () => [])
+// Utilisation du composable global unifié pour s'assurer du chargement et du cache
+const { allMovies: allMoviesCatalog, loading, fetchMovies } = useVfqMovies()
+
+await fetchMovies()
 
 // Calcul synchrone instantané des performances de l'acteur depuis le cache global
 const groupedPerformances = computed(() => {
   const targetName = name.value
-  if (!targetName || !allMoviesCatalog.value || allMoviesCatalog.value.length === 0) return []
+  if (!targetName || !allMoviesCatalog.value || !Array.isArray(allMoviesCatalog.value) || allMoviesCatalog.value.length === 0) return []
 
   const groups = {}
 
@@ -79,9 +81,6 @@ const groupedPerformances = computed(() => {
     count: groups[vfqName].length
   })).sort((a, b) => b.count - a.count)
 })
-
-// Chargement actif uniquement si le cache global de l'app n'est pas encore prêt
-const loading = computed(() => !allMoviesCatalog.value || allMoviesCatalog.value.length === 0)
 
 const toggleGroup = (vfq) => {
   openGroups.value[vfq] = !openGroups.value[vfq]

@@ -1,76 +1,21 @@
 <script setup>
-const supabase = useSupabaseClient()
 const router = useRouter()
 
 const sortType = useState('vfq_comediens_sort', () => 'az')
 const displayLimit = ref(40)
 
-const allMoviesComediens = useState('vfq_all_movies_comediens', () => null)
-const loading = ref(true)
+// Utilisation du composable global unifié pour récupérer toute la base
+const { allMovies: rawMovies, loading, fetchMovies } = useVfqMovies()
 
-const fetchAllMovies = async (forceRefresh = false) => {
-  if (allMoviesComediens.value && !forceRefresh) {
-    loading.value = false
-    smartBackgroundSync()
-    return
-  }
-
-  let allData = []
-  let page = 0
-  const pageSize = 1000
-  let fetchMore = true
-
-  while (fetchMore) {
-    const { data, error } = await supabase
-      .from('fiches_vfq')
-      .select('*')
-      .order('id', { ascending: true })
-      .range(page * pageSize, (page + 1) * pageSize - 1)
-
-    if (error || !data || data.length === 0) {
-      fetchMore = false
-    } else {
-      allData = allData.concat(data)
-      if (data.length < pageSize) {
-        fetchMore = false
-      } else {
-        page++
-      }
-    }
-  }
-
-  allMoviesComediens.value = allData
-  loading.value = false
-}
-
-const smartBackgroundSync = async () => {
-  if (!allMoviesComediens.value || allMoviesComediens.value.length === 0) return
-
-  const { data, error } = await supabase
-    .from('fiches_vfq')
-    .select('id')
-    .order('id', { ascending: false })
-    .limit(1)
-
-  if (!error && data && data.length > 0) {
-    const latestDbId = data[0].id
-    const cachedLatestId = Math.max(...allMoviesComediens.value.map(m => Number(m.id) || 0))
-
-    if (latestDbId > cachedLatestId) {
-      await fetchAllMovies(true)
-    }
-  }
-}
-
-await fetchAllMovies(false)
+await fetchMovies()
 
 // Calcul et agrégation des statistiques par comédien avec toutes les clés possibles
 const comediensStats = computed(() => {
-  if (!allMoviesComediens.value) return []
+  if (!rawMovies.value || !Array.isArray(rawMovies.value)) return []
 
   const counts = {}
 
-  allMoviesComediens.value.forEach(m => {
+  rawMovies.value.forEach(m => {
     const castList = m.cast_data || m.cast || m.extra_data?.cast
     
     if (Array.isArray(castList)) {

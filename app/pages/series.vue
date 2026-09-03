@@ -1,19 +1,22 @@
 <script setup>
-const supabase = useSupabaseClient()
 const router = useRouter()
 
 const sortType = useState('vfq_series_sort', () => 'default') 
 const selectedYear = useState('vfq_series_year', () => '')
 
-const allSeries = useState('vfq_all_series', () => null)
 const movies = ref([])
 const totalCount = ref(0)
-const loading = ref(true)
 const loadingMore = ref(false)
 const page = ref(0)
 const pageSize = 60
 const hasMore = ref(true)
 const sentinel = ref(null)
+
+// On utilise le composable global unifié pour récupérer tous les films, 
+// tout en filtrant instantanément sur les séries télé
+const { allMovies, loading, fetchMovies } = useVfqMovies()
+
+await fetchMovies()
 
 const isSeriesProject = (m) => {
   const type = m.project_type || m.projectType || m.extra?.projectType || m.extra_data?.projectType
@@ -28,6 +31,11 @@ const isSeriesProject = (m) => {
   return str.includes('serie') || str.includes('tv')
 }
 
+const allSeries = computed(() => {
+  if (!allMovies.value || !Array.isArray(allMovies.value)) return []
+  return allMovies.value.filter(m => isSeriesProject(m))
+})
+
 const extractYear = (m) => {
   if (m.release_year) return String(m.release_year)
   if (m.releaseYear) return String(m.releaseYear)
@@ -36,62 +44,6 @@ const extractYear = (m) => {
   if (!val) return null
   const match = val.toString().match(/\d{4}/)
   return match ? match[0] : null
-}
-
-const fetchAllSeries = async (forceRefresh = false) => {
-  if (allSeries.value && !forceRefresh) {
-    totalCount.value = allSeries.value.length
-    loading.value = false
-    smartBackgroundSync()
-    return
-  }
-
-  let allData = []
-  let rangeStep = 1000
-  let from = 0
-  let keepFetching = true
-
-  while (keepFetching) {
-    const { data, error } = await supabase
-      .from('fiches_vfq')
-      .select('*')
-      .range(from, from + rangeStep - 1)
-
-    if (error || !data || data.length === 0) {
-      keepFetching = false
-    } else {
-      allData = allData.concat(data)
-      if (data.length < rangeStep) {
-        keepFetching = false
-      } else {
-        from += rangeStep
-      }
-    }
-  }
-
-  allSeries.value = allData.filter(m => isSeriesProject(m))
-  totalCount.value = allSeries.value.length
-  loading.value = false
-}
-
-const smartBackgroundSync = async () => {
-  if (!allSeries.value || allSeries.value.length === 0) return
-
-  const { data, error } = await supabase
-    .from('fiches_vfq')
-    .select('id')
-    .order('id', { ascending: false })
-    .limit(1)
-
-  if (!error && data && data.length > 0) {
-    const latestDbId = data[0].id
-    const cachedLatestId = Math.max(...allSeries.value.map(m => Number(m.id) || 0))
-
-    if (latestDbId > cachedLatestId) {
-      await fetchAllSeries(true)
-      updateDisplayedMovies(true)
-    }
-  }
 }
 
 const processedSeries = computed(() => {
@@ -127,16 +79,17 @@ const updateDisplayedMovies = (reset = false) => {
     page.value = 0
   }
   const filtered = processedSeries.value
+  totalCount.value = filtered.length
   const end = (page.value + 1) * pageSize
   
   movies.value = filtered.slice(0, end)
   hasMore.value = movies.value.length < filtered.length
 }
 
-await fetchAllSeries(false)
+// Initialisation de l'affichage en fonction des données filtrées
 updateDisplayedMovies(true)
 
-watch([sortType, selectedYear], () => {
+watch([sortType, selectedYear, allSeries], () => {
   updateDisplayedMovies(true)
 })
 

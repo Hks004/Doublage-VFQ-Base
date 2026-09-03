@@ -1,5 +1,4 @@
 <script setup>
-const supabase = useSupabaseClient()
 const router = useRouter()
 
 const sortType = useState('vfq_animation_sort', () => 'default')
@@ -7,8 +6,10 @@ const selectedYear = useState('vfq_animation_year', () => '')
 
 const displayLimit = ref(40)
 
-const allAnimation = useState('vfq_all_animation', () => null)
-const loading = ref(true)
+// Utilisation du composable centralisé pour récupérer la base complète en cache
+const { allMovies: rawMovies, loading, fetchMovies } = useVfqMovies()
+
+await fetchMovies()
 
 const isAnimation = (m) => {
   const type = m.project_type || m.projectType || m.extra?.projectType || m.extra_data?.projectType
@@ -23,61 +24,11 @@ const isAnimation = (m) => {
   return str.includes('animation') || str.includes('jeunesse')
 }
 
-const fetchAllAnimation = async (forceRefresh = false) => {
-  if (allAnimation.value && !forceRefresh) {
-    loading.value = false
-    smartBackgroundSync()
-    return
-  }
-
-  let allData = []
-  let rangeStep = 1000
-  let from = 0
-  let keepFetching = true
-
-  while (keepFetching) {
-    const { data, error } = await supabase
-      .from('fiches_vfq')
-      .select('*')
-      .order('id', { ascending: false })
-      .range(from, from + rangeStep - 1)
-
-    if (error || !data || data.length === 0) {
-      keepFetching = false
-    } else {
-      allData = allData.concat(data)
-      if (data.length < rangeStep) {
-        keepFetching = false
-      } else {
-        from += rangeStep
-      }
-    }
-  }
-
-  allAnimation.value = allData.filter(m => isAnimation(m))
-  loading.value = false
-}
-
-const smartBackgroundSync = async () => {
-  if (!allAnimation.value || allAnimation.value.length === 0) return
-
-  const { data, error } = await supabase
-    .from('fiches_vfq')
-    .select('id')
-    .order('id', { ascending: false })
-    .limit(1)
-
-  if (!error && data && data.length > 0) {
-    const latestDbId = data[0].id
-    const cachedLatestId = Math.max(...allAnimation.value.map(m => Number(m.id) || 0))
-
-    if (latestDbId > cachedLatestId) {
-      await fetchAllAnimation(true)
-    }
-  }
-}
-
-await fetchAllAnimation(false)
+// Filtrage instantané de l'animation depuis les données globales partagées
+const allAnimation = computed(() => {
+  if (!rawMovies.value || !Array.isArray(rawMovies.value)) return []
+  return rawMovies.value.filter(m => isAnimation(m))
+})
 
 const navigateIfNoSelection = (movieId) => {
   const selection = window.getSelection().toString()

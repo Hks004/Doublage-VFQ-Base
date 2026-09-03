@@ -1,41 +1,19 @@
 <script setup>
 const route = useRoute()
 const router = useRouter()
-const supabase = useSupabaseClient()
 
 const movieId = computed(() => route.params.id)
 
-// On récupère le catalogue global en mémoire
-const allMoviesCatalog = useState('vfq_all_movies_comediens', () => null)
+// Utilisation du composable global unifié
+const { allMovies: allMoviesCatalog, loading, fetchMovies } = useVfqMovies()
 
-// Recherche immédiate et synchrone dans le cache si disponible
-const cachedMovie = computed(() => {
-  if (!allMoviesCatalog.value) return null
+await fetchMovies()
+
+// Recherche du film dans le catalogue global chargé en mémoire
+const movie = computed(() => {
+  if (!allMoviesCatalog.value || !Array.isArray(allMoviesCatalog.value)) return null
   return allMoviesCatalog.value.find(m => String(m.id) === String(movieId.value)) || null
 })
-
-// Si le film n'est pas dans le cache (accès direct par URL), on le charge en arrière-plan avec useAsyncData
-const { data: fetchedMovie, pending: loading } = await useAsyncData(
-  `movie-detail-${movieId.value}`,
-  async () => {
-    if (cachedMovie.value) return null // Pas besoin de fetch si déjà en cache
-    const { data, error } = await supabase
-      .from('fiches_vfq')
-      .select('*')
-      .eq('id', movieId.value)
-      .single()
-
-    if (error || !data) return null
-    return data
-  },
-  {
-    // Ne lance fetch que si on ne l'a pas trouvé en cache
-    immediate: !cachedMovie.value
-  }
-)
-
-// Le film final vient soit du cache instantané, soit du fetch unitaire
-const movie = computed(() => cachedMovie.value || fetchedMovie.value)
 
 // Extraction propre du casting (gère cast_data ou cast)
 const cast = computed(() => {
@@ -61,8 +39,8 @@ useHead(() => ({
 </script>
 
 <template>
-  <!-- S'affiche instantanément si le film est dans le cache, sans attendre le loader -->
-  <div class="page-detail" v-if="movie">
+  <!-- S'affiche instantanément si le film est trouvé dans le catalogue -->
+  <div class="page-detail" v-if="!loading && movie">
     <div class="nav-container">
       <a href="#" @click.prevent="goBack" class="back-link">← RETOUR</a>
     </div>
@@ -169,11 +147,12 @@ useHead(() => ({
       </div>
     </div>
   </div>
-  <!-- Affiché uniquement si on arrive par URL directe et que Supabase charge encore -->
+  <!-- Chargement global -->
   <div v-else-if="loading" class="loader">
     <div class="spinner"></div>
     <p>Chargement...</p>
   </div>
+  <!-- Si le chargement est terminé mais que le film n'existe pas -->
   <div v-else class="loader">
     <p>Film introuvable.</p>
   </div>

@@ -2,60 +2,22 @@
 const supabase = useSupabaseClient()
 const router = useRouter()
 
-// 1. On récupère le catalogue global en mémoire (partagé depuis app.vue si navigation interne)
-const allMoviesCatalog = useState('vfq_all_movies_comediens', () => [])
+// 1. On récupère le catalogue global en mémoire via le composable centralisé
+const { allMovies: allMoviesCatalog, loading: directLoading, fetchMovies } = useVfqMovies()
 
-// Variable locale de chargement au cas où le cache global est vide (F5 direct)
-const directLoading = ref(false)
+await fetchMovies()
 
-// Si l'utilisateur arrive par un F5 sur l'accueil, le cache est vide -> on va le chercher
-onMounted(async () => {
-  if (!allMoviesCatalog.value || allMoviesCatalog.value.length === 0) {
-    directLoading.value = true
-    try {
-      let allData = []
-      let page = 0
-      const pageSize = 1000
-      let fetchMore = true
-
-      while (fetchMore) {
-        const { data, error } = await supabase
-          .from('fiches_vfq')
-          .select('*')
-          .order('id', { ascending: true })
-          .range(page * pageSize, (page + 1) * pageSize - 1)
-
-        if (error || !data || data.length === 0) {
-          fetchMore = false
-        } else {
-          allData = allData.concat(data)
-          if (data.length < pageSize) {
-            fetchMore = false
-          } else {
-            page++
-          }
-        }
-      }
-      allMoviesCatalog.value = allData
-    } catch (err) {
-      console.error("Erreur lors du chargement de secours (F5) :", err)
-    } finally {
-      directLoading.value = false
-    }
-  }
-})
-
-// 2. Extraire les 5 derniers films triés par ID décroissant depuis le cache (ou les données chargées)
+// 2. Extraire les 5 derniers films triés par ID décroissant depuis le cache
 const derniersAjouts = computed(() => {
-  if (!allMoviesCatalog.value || allMoviesCatalog.value.length === 0) return []
+  if (!allMoviesCatalog.value || !Array.isArray(allMoviesCatalog.value)) return []
   return [...allMoviesCatalog.value]
-    .sort((a, b) => (b.id || 0) - (a.id || 0))
+    .sort((a, b) => (Number(b.id) || 0) - (Number(a.id) || 0))
     .slice(0, 5)
 })
 
 // 3. Calculer le top des comédiens actifs
 const topComediens = computed(() => {
-  if (!allMoviesCatalog.value || allMoviesCatalog.value.length === 0) return []
+  if (!allMoviesCatalog.value || !Array.isArray(allMoviesCatalog.value)) return []
   
   const counts = {}
 
@@ -122,6 +84,10 @@ const extractYear = (m) => {
   const match = val.toString().match(/\d{4}/)
   return match ? match[0] : '----'
 }
+
+useHead({
+  title: 'Doublage VFQ - Base de données du doublage québécois'
+})
 </script>
 
 <template>

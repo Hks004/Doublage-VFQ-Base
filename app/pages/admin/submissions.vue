@@ -35,7 +35,7 @@
       Aucune soumission en attente pour le moment.
     </div>
 
-    <div v-else class="admin-layout">
+    <div v-else class="admin-layout" :class="{ 'mobile-view-detail': selectedSubmission }">
       <!-- Liste des soumissions à gauche -->
       <div class="submissions-list">
         <ul>
@@ -54,7 +54,10 @@
 
       <!-- Détails et validation à droite -->
       <div class="submission-details" v-if="selectedSubmission">
-        <h2>Détails de la soumission</h2>
+        <div class="detail-header-mobile">
+          <button type="button" @click="selectedSubmission = null" class="btn-back-list">← Retour à la liste</button>
+          <h2>Détails de la soumission</h2>
+        </div>
         
         <!-- Section Film -->
         <div class="detail-section">
@@ -147,7 +150,7 @@
         </div>
       </div>
 
-      <div class="submission-details placeholder" v-else>
+      <div class="submission-details placeholder desktop-only" v-else>
         <p>Sélectionne une soumission dans la liste pour l'inspecter et la modifier.</p>
       </div>
     </div>
@@ -188,7 +191,7 @@ const fetchSubmissions = async () => {
     console.error('Erreur chargement soumissions:', error)
   } else {
     submissions.value = data || []
-    if (submissions.value.length > 0 && !selectedSubmission.value) {
+    if (submissions.value.length > 0 && !selectedSubmission.value && window.innerWidth > 768) {
       selectedSubmission.value = JSON.parse(JSON.stringify(submissions.value[0]))
       if (!selectedSubmission.value.extra_data) selectedSubmission.value.extra_data = {}
       if (!selectedSubmission.value.cast_data) selectedSubmission.value.cast_data = []
@@ -220,7 +223,6 @@ const removeAdminCastMember = (index) => {
 
 const publishSubmission = async (sub) => {
   try {
-    // 1. Récupération du plus grand movie_id actuel pour assurer la suite logique
     const { data: lastMovie, error: fetchError } = await supabase
       .from('fiches_vfq')
       .select('movie_id')
@@ -234,7 +236,6 @@ const publishSubmission = async (sub) => {
       nextMovieId = Number(lastMovie[0].movie_id) + 1
     }
 
-    // 2. Insertion dans fiches_vfq avec le movie_id calculé et incrémenté
     const { error: insertError } = await supabase
       .from('fiches_vfq')
       .insert([
@@ -251,7 +252,6 @@ const publishSubmission = async (sub) => {
 
     if (insertError) throw insertError
 
-    // 3. Suppression de la soumission validée
     await deleteSubmission(sub.id, false)
     alert(`Film publié avec succès ! Attribué au movie_id : ${nextMovieId}`)
 
@@ -476,6 +476,24 @@ const formatDate = (dateString) => {
   height: 400px;
 }
 
+.detail-header-mobile {
+  display: none;
+  align-items: center;
+  gap: 15px;
+  margin-bottom: 5px;
+}
+
+.btn-back-list {
+  background: #262626;
+  color: #fff;
+  border: 1px solid #444;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+
 .detail-section {
   background: #1a1a1a;
   border: 1px solid #262626;
@@ -626,5 +644,52 @@ const formatDate = (dateString) => {
 .loading, .no-submissions {
   color: #888;
   margin-top: 20px;
+}
+
+/* RESPONSIVE MOBILE */
+@media (max-width: 900px) {
+  .admin-layout {
+    grid-template-columns: 1fr;
+  }
+  
+  .desktop-only {
+    display: none;
+  }
+
+  /* Si une soumission est sélectionnée sur mobile, on masque la liste et on affiche les détails en plein écran */
+  .admin-layout.mobile-view-detail .submissions-list {
+    display: none;
+  }
+  
+  .submission-details {
+    max-height: none;
+    padding: 15px;
+  }
+
+  .detail-header-mobile {
+    display: flex;
+  }
+
+  .grid-2 {
+    grid-template-columns: 1fr;
+  }
+
+  .cast-row-admin {
+    grid-template-columns: 1fr;
+    background: #111;
+    padding: 10px;
+    border-radius: 6px;
+    border: 1px solid #333;
+    gap: 6px;
+  }
+
+  .cast-row-admin .btn-delete {
+    width: 100%;
+    height: 32px;
+  }
+
+  .actions {
+    flex-direction: column;
+  }
 }
 </style>

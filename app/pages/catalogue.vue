@@ -1,5 +1,6 @@
 <script setup>
-const supabase = useSupabaseClient()
+import { useVfqMovies } from '@/composables/useVfqMovies'
+
 const router = useRouter()
 
 const sortType = useState('vfq_catalog_sort', () => 'default')
@@ -7,65 +8,11 @@ const selectedYear = useState('vfq_catalog_year', () => '')
 
 const displayLimit = ref(40)
 
-const allMovies = useState('vfq_catalog_all_movies', () => null)
-const loading = ref(true)
+// On utilise ton composable avec import explicite pour éviter tout problème d'auto-import
+const { allMovies, loading, fetchMovies } = useVfqMovies()
 
-const fetchAllMovies = async (forceRefresh = false) => {
-  if (allMovies.value && !forceRefresh) {
-    loading.value = false
-    smartBackgroundSync()
-    return
-  }
-
-  let allData = []
-  let rangeStep = 1000
-  let from = 0
-  let keepFetching = true
-
-  while (keepFetching) {
-    const { data, error } = await supabase
-      .from('fiches_vfq')
-      .select('*')
-      .order('id', { ascending: false })
-      .range(from, from + rangeStep - 1)
-
-    if (error || !data || data.length === 0) {
-      keepFetching = false
-    } else {
-      allData = allData.concat(data)
-      if (data.length < rangeStep) {
-        keepFetching = false
-      } else {
-        from += rangeStep
-      }
-    }
-  }
-
-  // On prend TOUT sans filtre de type pour le catalogue complet
-  allMovies.value = allData
-  loading.value = false
-}
-
-const smartBackgroundSync = async () => {
-  if (!allMovies.value || allMovies.value.length === 0) return
-
-  const { data, error } = await supabase
-    .from('fiches_vfq')
-    .select('id')
-    .order('id', { ascending: false })
-    .limit(1)
-
-  if (!error && data && data.length > 0) {
-    const latestDbId = data[0].id
-    const cachedLatestId = Math.max(...allMovies.value.map(m => Number(m.id) || 0))
-
-    if (latestDbId > cachedLatestId) {
-      await fetchAllMovies(true)
-    }
-  }
-}
-
-await fetchAllMovies(false)
+// Chargement initial (instantané si déjà en mémoire, charge en arrière-plan ou affiche le loader si F5)
+await fetchMovies()
 
 const navigateIfNoSelection = (movieId) => {
   const selection = window.getSelection().toString()
@@ -82,7 +29,7 @@ const extractYear = (m) => {
 }
 
 const availableYears = computed(() => {
-  if (!allMovies.value) return []
+  if (!allMovies.value || !Array.isArray(allMovies.value)) return []
   const years = allMovies.value
     .map(m => extractYear(m))
     .filter(y => y !== null)
@@ -90,10 +37,11 @@ const availableYears = computed(() => {
 })
 
 const filtered = computed(() => {
-  if (!allMovies.value) return []
+  if (!allMovies.value || !Array.isArray(allMovies.value)) return []
   
-  // Filtre uniquement par année si sélectionnée, mais laisse passer TOUS les types (films, séries, animations...)
+  // Filtre uniquement par année si sélectionnée, mais laisse passer TOUS le reste
   let list = allMovies.value.filter(m => {
+    if (!m) return false
     const year = extractYear(m)
     return selectedYear.value === '' || String(year) === String(selectedYear.value)
   })
@@ -174,7 +122,7 @@ useHead({
       <div class="header-section">
         <div class="title-area">
           <h1>Tout le Catalogue</h1>
-          <p class="count">{{ filtered.length }} titres répertoriés</p>
+          <p class="count">{{ filtered?.length || 0 }} titres répertoriés</p>
         </div>
         
         <div class="controls">
@@ -219,7 +167,7 @@ useHead({
         </div>
       </div>
 
-      <div v-if="displayLimit < filtered.length" class="loader-scrolling">
+      <div v-if="displayLimit < (filtered?.length || 0)" class="loader-scrolling">
         Chargement de la suite...
       </div>
     </div>
