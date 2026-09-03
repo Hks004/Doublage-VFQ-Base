@@ -8,7 +8,6 @@ const selectedYear = useState('vfq_animation_year', () => '')
 const displayLimit = ref(40)
 
 const allAnimation = useState('vfq_all_animation', () => null)
-const loading = ref(true)
 
 const isAnimation = (m) => {
   const type = m.project_type || m.projectType || m.extra?.projectType || m.extra_data?.projectType
@@ -23,11 +22,11 @@ const isAnimation = (m) => {
   return str.includes('animation') || str.includes('jeunesse')
 }
 
-const fetchAllAnimation = async (forceRefresh = false) => {
-  if (allAnimation.value && !forceRefresh) {
-    loading.value = false
+// Chargement asynchrone non bloquant (instantané au clic)
+const { pending: loading, refresh: fetchAllAnimation } = await useLazyAsyncData('vfq-all-animation', async () => {
+  if (allAnimation.value && allAnimation.value.length > 0) {
     smartBackgroundSync()
-    return
+    return allAnimation.value
   }
 
   let allData = []
@@ -54,9 +53,12 @@ const fetchAllAnimation = async (forceRefresh = false) => {
     }
   }
 
-  allAnimation.value = allData.filter(m => isAnimation(m))
-  loading.value = false
-}
+  const filteredAnimation = allData.filter(m => isAnimation(m))
+  allAnimation.value = filteredAnimation
+  return filteredAnimation
+}, {
+  server: false
+})
 
 const smartBackgroundSync = async () => {
   if (!allAnimation.value || allAnimation.value.length === 0) return
@@ -76,8 +78,6 @@ const smartBackgroundSync = async () => {
     }
   }
 }
-
-await fetchAllAnimation(false)
 
 const navigateIfNoSelection = (movieId) => {
   const selection = window.getSelection().toString()
@@ -227,7 +227,7 @@ useHead({
       </div>
     </div>
   </div>
-  <div v-else class="loader">Chargement de la section animation...</div>
+  <div v-else class="loader">Chargement...</div>
 </template>
 
 <style scoped>

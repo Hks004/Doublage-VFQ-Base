@@ -2,64 +2,62 @@
 const supabase = useSupabaseClient()
 const router = useRouter()
 
-// 1. On récupère le catalogue global en mémoire (partagé depuis app.vue si navigation interne)
-const allMoviesCatalog = useState('vfq_all_movies_comediens', () => [])
+// 1. On récupère le catalogue global en mémoire avec Nuxt (non bloquant)
+const allMoviesCatalog = useState('vfq_all_movies_comediens', () => null)
 
-// Variable locale de chargement au cas où le cache global est vide (F5 direct)
-const directLoading = ref(false)
+// Chargement asynchrone non bloquant (instantané au clic)
+const { pending: loading, refresh: fetchCatalog } = await useLazyAsyncData('vfq-home-catalog', async () => {
+  if (allMoviesCatalog.value && allMoviesCatalog.value.length > 0) {
+    return allMoviesCatalog.value
+  }
 
-// Si l'utilisateur arrive par un F5 sur l'accueil, le cache est vide -> on va le chercher
-onMounted(async () => {
-  if (!allMoviesCatalog.value || allMoviesCatalog.value.length === 0) {
-    directLoading.value = true
-    try {
-      let allData = []
-      let page = 0
-      const pageSize = 1000
-      let fetchMore = true
+  let allData = []
+  let page = 0
+  const pageSize = 1000
+  let fetchMore = true
 
-      while (fetchMore) {
-        const { data, error } = await supabase
-          .from('fiches_vfq')
-          .select('*')
-          .order('id', { ascending: true })
-          .range(page * pageSize, (page + 1) * pageSize - 1)
+  while (fetchMore) {
+    const { data, error } = await supabase
+      .from('fiches_vfq')
+      .select('*')
+      .order('id', { ascending: true })
+      .range(page * pageSize, (page + 1) * pageSize - 1)
 
-        if (error || !data || data.length === 0) {
-          fetchMore = false
-        } else {
-          allData = allData.concat(data)
-          if (data.length < pageSize) {
-            fetchMore = false
-          } else {
-            page++
-          }
-        }
+    if (error || !data || data.length === 0) {
+      fetchMore = false
+    } else {
+      allData = allData.concat(data)
+      if (data.length < pageSize) {
+        fetchMore = false
+      } else {
+        page++
       }
-      allMoviesCatalog.value = allData
-    } catch (err) {
-      console.error("Erreur lors du chargement de secours (F5) :", err)
-    } finally {
-      directLoading.value = false
     }
   }
+
+  allMoviesCatalog.value = allData
+  return allData
+}, {
+  server: false
 })
 
-// 2. Extraire les 5 derniers films triés par ID décroissant depuis le cache (ou les données chargées)
+// 2. Extraire les 5 derniers films triés par ID décroissant depuis le cache
 const derniersAjouts = computed(() => {
-  if (!allMoviesCatalog.value || allMoviesCatalog.value.length === 0) return []
-  return [...allMoviesCatalog.value]
+  const data = allMoviesCatalog.value
+  if (!data || data.length === 0) return []
+  return [...data]
     .sort((a, b) => (b.id || 0) - (a.id || 0))
     .slice(0, 5)
 })
 
 // 3. Calculer le top des comédiens actifs
 const topComediens = computed(() => {
-  if (!allMoviesCatalog.value || allMoviesCatalog.value.length === 0) return []
+  const data = allMoviesCatalog.value
+  if (!data || data.length === 0) return []
   
   const counts = {}
 
-  allMoviesCatalog.value.forEach(m => {
+  data.forEach(m => {
     const castList = m.cast_data || m.cast || m.extra_data?.cast
     
     if (Array.isArray(castList)) {
@@ -89,8 +87,6 @@ const topComediens = computed(() => {
     .sort((a, b) => b.count - a.count || a.nom.localeCompare(b.nom, 'fr'))
     .slice(0, 6)
 })
-
-const isLoaded = computed(() => !directLoading.value && allMoviesCatalog.value && allMoviesCatalog.value.length > 0)
 
 const navigateSafely = (e, route) => {
   const selection = window.getSelection().toString()
@@ -122,11 +118,15 @@ const extractYear = (m) => {
   const match = val.toString().match(/\d{4}/)
   return match ? match[0] : '----'
 }
+
+useHead({
+  title: 'Accueil - Doublage VFQ'
+})
 </script>
 
 <template>
   <div class="home-page">
-    <div v-if="isLoaded" class="container">
+    <div v-if="!loading" class="container">
       
       <section class="hero-section">
         <h1>Bienvenue sur ⚜ Doublage<span>VFQ</span></h1>

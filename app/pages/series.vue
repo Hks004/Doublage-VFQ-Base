@@ -249,7 +249,7 @@ useHead({
       </div>
     </div>
   </div>
-  <div v-else class="loader">Chargement des séries...</div>
+  <div v-else class="loader">Chargement...</div>
 </template>
 
 <style scoped>

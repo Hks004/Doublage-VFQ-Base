@@ -184,6 +184,7 @@ const submitMovie = async () => {
         {
           translated_name: form.value.translated_name,
           original_name: form.value.original_name,
+          release_year: form.value.release_year ? Number(form.value.release_year) : null,
           description: form.value.description,
           poster_path: form.value.poster_path,
           cast_data: cleanedCast,
