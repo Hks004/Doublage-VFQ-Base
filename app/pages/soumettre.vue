@@ -20,13 +20,9 @@
               <label>Titre VFQ (au Québec) *</label>
               <input v-model="form.translated_name" type="text" required placeholder="Ex: Rapides et dangereux" />
             </div>
-            <div>
+            <div class="full-width">
               <label>Titre original</label>
               <input v-model="form.original_name" type="text" placeholder="Ex: The Fast and The Furious" />
-            </div>
-            <div>
-              <label>Année de sortie</label>
-              <input v-model="form.release_year" type="number" placeholder="Ex: 2001" />
             </div>
             <div class="full-width">
               <label>Poster Path (lien TMDB relatif, ex: /abc.jpg)</label>
@@ -119,7 +115,6 @@ const client = useSupabaseClient()
 const form = ref({
   translated_name: '',
   original_name: '',
-  release_year: '',
   description: '',
   poster_path: ''
 })
@@ -184,7 +179,6 @@ const submitMovie = async () => {
         {
           translated_name: form.value.translated_name,
           original_name: form.value.original_name,
-          release_year: form.value.release_year ? Number(form.value.release_year) : null,
           description: form.value.description,
           poster_path: form.value.poster_path,
           cast_data: cleanedCast,
@@ -197,7 +191,7 @@ const submitMovie = async () => {
 
     successMessage.value = 'Merci ! Votre soumission a bien été envoyée et est en attente de validation.'
     
-    form.value = { translated_name: '', original_name: '', release_year: '', description: '', poster_path: '' }
+    form.value = { translated_name: '', original_name: '', description: '', poster_path: '' }
     extra.value = { studio: '', adapter: '', director: '', producer: '', dvdRelease: '', distributor: '', projectType: '', theatricalRelease: '' }
     castList.value = []
 
