@@ -15,7 +15,7 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: '22'
 
       - name: Install Supabase client
         run: npm install @supabase/supabase-js
@@ -29,7 +29,7 @@ jobs:
             const { createClient } = require('@supabase/supabase-js');
             const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_KEY);
             async function ping() {
-              const { data, error } = await supabase.from('movies').select('id').limit(1);
+              const { data, error } = await supabase.from('fiches_vfq').select('id').limit(1);
               if (error) {
                 console.error('Erreur lors du ping Supabase:', error);
                 process.exit(1);
