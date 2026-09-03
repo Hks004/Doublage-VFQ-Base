@@ -8,6 +8,7 @@ const selectedYear = useState('vfq_series_year', () => '')
 const allSeries = useState('vfq_all_series', () => null)
 const movies = ref([])
 const totalCount = ref(0)
+const loading = ref(true)
 const loadingMore = ref(false)
 const page = ref(0)
 const pageSize = 60
@@ -37,11 +38,12 @@ const extractYear = (m) => {
   return match ? match[0] : null
 }
 
-// Chargement asynchrone non bloquant pour rendre le clic instantané
-const { pending: loading, refresh: fetchAllSeries } = await useLazyAsyncData('vfq-all-series', async () => {
-  if (allSeries.value) {
+const fetchAllSeries = async (forceRefresh = false) => {
+  if (allSeries.value && !forceRefresh) {
+    totalCount.value = allSeries.value.length
+    loading.value = false
     smartBackgroundSync()
-    return allSeries.value
+    return
   }
 
   let allData = []
@@ -67,20 +69,10 @@ const { pending: loading, refresh: fetchAllSeries } = await useLazyAsyncData('vf
     }
   }
 
-  const seriesData = allData.filter(m => isSeriesProject(m))
-  allSeries.value = seriesData
-  return seriesData
-}, {
-  server: false
-})
-
-// Met à jour totalCount dès que les données changent
-watch(allSeries, (newVal) => {
-  if (newVal) {
-    totalCount.value = newVal.length
-    updateDisplayedMovies(true)
-  }
-}, { immediate: true })
+  allSeries.value = allData.filter(m => isSeriesProject(m))
+  totalCount.value = allSeries.value.length
+  loading.value = false
+}
 
 const smartBackgroundSync = async () => {
   if (!allSeries.value || allSeries.value.length === 0) return
@@ -140,6 +132,9 @@ const updateDisplayedMovies = (reset = false) => {
   movies.value = filtered.slice(0, end)
   hasMore.value = movies.value.length < filtered.length
 }
+
+await fetchAllSeries(false)
+updateDisplayedMovies(true)
 
 watch([sortType, selectedYear], () => {
   updateDisplayedMovies(true)
@@ -249,7 +244,7 @@ useHead({
       </div>
     </div>
   </div>
-  <div v-else class="loader">Chargement...</div>
+  <div v-else class="loader">Chargement des séries...</div>
 </template>
 
 <style scoped>

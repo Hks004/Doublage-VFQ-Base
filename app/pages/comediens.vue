@@ -6,12 +6,13 @@ const sortType = useState('vfq_comediens_sort', () => 'az')
 const displayLimit = ref(40)
 
 const allMoviesComediens = useState('vfq_all_movies_comediens', () => null)
+const loading = ref(true)
 
-// Chargement asynchrone non bloquant avec useLazyAsyncData et server: false
-const { pending: loading, refresh: fetchAllMovies } = await useLazyAsyncData('vfq-all-movies-comediens', async () => {
-  if (allMoviesComediens.value && allMoviesComediens.value.length > 0) {
+const fetchAllMovies = async (forceRefresh = false) => {
+  if (allMoviesComediens.value && !forceRefresh) {
+    loading.value = false
     smartBackgroundSync()
-    return allMoviesComediens.value
+    return
   }
 
   let allData = []
@@ -39,10 +40,8 @@ const { pending: loading, refresh: fetchAllMovies } = await useLazyAsyncData('vf
   }
 
   allMoviesComediens.value = allData
-  return allData
-}, {
-  server: false
-})
+  loading.value = false
+}
 
 const smartBackgroundSync = async () => {
   if (!allMoviesComediens.value || allMoviesComediens.value.length === 0) return
@@ -62,6 +61,8 @@ const smartBackgroundSync = async () => {
     }
   }
 }
+
+await fetchAllMovies(false)
 
 // Calcul et agrégation des statistiques par comédien avec toutes les clés possibles
 const comediensStats = computed(() => {

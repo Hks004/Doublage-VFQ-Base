@@ -8,6 +8,7 @@ const selectedYear = useState('vfq_films_year', () => '')
 const displayLimit = ref(40)
 
 const allMovies = useState('vfq_all_movies', () => null)
+const loading = ref(true)
 
 const isFilmProject = (m) => {
   const type = m.project_type || m.projectType || m.extra?.projectType || m.extra_data?.projectType
@@ -22,11 +23,11 @@ const isFilmProject = (m) => {
   return str.includes('film') || str.includes('movie') || str.includes('long')
 }
 
-// Chargement asynchrone non bloquant (instantané au clic)
-const { pending: loading, refresh: fetchAllMovies } = await useLazyAsyncData('vfq-all-movies', async () => {
-  if (allMovies.value && allMovies.value.length > 0) {
+const fetchAllMovies = async (forceRefresh = false) => {
+  if (allMovies.value && !forceRefresh) {
+    loading.value = false
     smartBackgroundSync()
-    return allMovies.value
+    return
   }
 
   let allData = []
@@ -53,12 +54,9 @@ const { pending: loading, refresh: fetchAllMovies } = await useLazyAsyncData('vf
     }
   }
 
-  const filteredMovies = allData.filter(m => isFilmProject(m))
-  allMovies.value = filteredMovies
-  return filteredMovies
-}, {
-  server: false
-})
+  allMovies.value = allData.filter(m => isFilmProject(m))
+  loading.value = false
+}
 
 const smartBackgroundSync = async () => {
   if (!allMovies.value || allMovies.value.length === 0) return
@@ -78,6 +76,8 @@ const smartBackgroundSync = async () => {
     }
   }
 }
+
+await fetchAllMovies(false)
 
 const navigateIfNoSelection = (movieId) => {
   const selection = window.getSelection().toString()

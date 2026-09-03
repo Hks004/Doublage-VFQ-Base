@@ -8,12 +8,13 @@ const selectedYear = useState('vfq_catalog_year', () => '')
 const displayLimit = ref(40)
 
 const allMovies = useState('vfq_catalog_all_movies', () => null)
+const loading = ref(true)
 
-// Chargement asynchrone non bloquant pour rendre le clic instantané
-const { pending: loading, refresh: fetchAllMovies } = await useLazyAsyncData('vfq-all-movies', async () => {
-  if (allMovies.value) {
+const fetchAllMovies = async (forceRefresh = false) => {
+  if (allMovies.value && !forceRefresh) {
+    loading.value = false
     smartBackgroundSync()
-    return allMovies.value
+    return
   }
 
   let allData = []
@@ -40,11 +41,10 @@ const { pending: loading, refresh: fetchAllMovies } = await useLazyAsyncData('vf
     }
   }
 
+  // On prend TOUT sans filtre de type pour le catalogue complet
   allMovies.value = allData
-  return allData
-}, {
-  server: false
-})
+  loading.value = false
+}
 
 const smartBackgroundSync = async () => {
   if (!allMovies.value || allMovies.value.length === 0) return
@@ -60,10 +60,12 @@ const smartBackgroundSync = async () => {
     const cachedLatestId = Math.max(...allMovies.value.map(m => Number(m.id) || 0))
 
     if (latestDbId > cachedLatestId) {
-      fetchAllMovies(true)
+      await fetchAllMovies(true)
     }
   }
 }
+
+await fetchAllMovies(false)
 
 const navigateIfNoSelection = (movieId) => {
   const selection = window.getSelection().toString()
@@ -90,6 +92,7 @@ const availableYears = computed(() => {
 const filtered = computed(() => {
   if (!allMovies.value) return []
   
+  // Filtre uniquement par année si sélectionnée, mais laisse passer TOUS les types (films, séries, animations...)
   let list = allMovies.value.filter(m => {
     const year = extractYear(m)
     return selectedYear.value === '' || String(year) === String(selectedYear.value)
