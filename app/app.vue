@@ -20,20 +20,10 @@ const handleClickOutside = (event) => {
 onMounted(async () => {
   window.addEventListener('click', handleClickOutside)
 
-  // 1. Si le useState est déjà rempli, on ne fait rien
+  // Si le useState est déjà rempli, on ne fait rien
   if (allData.value && allData.value.length > 0) return
 
-  // 2. Sinon, on regarde si on a une copie en cache local (LocalStorage) pour un affichage instantané
-  try {
-    const cached = localStorage.getItem('vfq_catalog_cache')
-    if (cached) {
-      allData.value = JSON.parse(cached)
-    }
-  } catch (e) {
-    console.error("Erreur lecture cache local", e)
-  }
-
-  // 3. Quoi qu'il arrive, on télécharge la base complète en arrière-plan pour avoir les dernières données
+  // On télécharge la base complète en arrière-plan (sans saturer le localStorage)
   try {
     let allRows = []
     let page = 0
@@ -61,8 +51,6 @@ onMounted(async () => {
     }
 
     allData.value = allRows
-    // On sauvegarde dans le navigateur pour les prochaines visites instantanées
-    localStorage.setItem('vfq_catalog_cache', JSON.stringify(allRows))
   } catch (error) {
     console.error("Erreur de chargement Supabase:", error)
   }
