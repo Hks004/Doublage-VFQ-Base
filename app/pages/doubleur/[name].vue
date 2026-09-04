@@ -46,7 +46,7 @@ const groupedRoles = computed(() => {
       const rawDoubleur = c.doubleVFQ || c.double_vfq || c.voice || c.doubleur_vfq || c.doubleur || c.nom || c.name || ''
       const cleanedDoubleur = cleanString(rawDoubleur)
 
-      if (cleanedDoubleur && (cleanedDoubleur === targetName || cleanedDoubleur.includes(targetName))) {
+      if (cleanedDoubleur && cleanedDoubleur === targetName) {
         const actorName = c.actor || c.actor_original || c.original_actor || 'Acteur inconnu'
         const movieTitle = film.translated_name || c.movie_title || 'Titre inconnu'
         const movieId = film.id
