@@ -49,7 +49,7 @@ const groupedRoles = computed(() => {
       if (cleanedDoubleur && cleanedDoubleur === targetName) {
         const actorName = c.actor || c.actor_original || c.original_actor || 'Acteur inconnu'
         const movieTitle = film.translated_name || c.movie_title || 'Titre inconnu'
-        const movieId = film.id
+        const movieId = film.movie_id
         const characterRole = c.role || c.character || '—'
         
         // Ciblage exclusif de la sortie en salle (theatricalRelease)

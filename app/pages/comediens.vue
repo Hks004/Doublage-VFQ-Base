@@ -9,7 +9,7 @@ const { allMovies: rawMovies, loading, fetchMovies } = useVfqMovies()
 
 await fetchMovies()
 
-// Calcul et agrégation des statistiques par comédien avec toutes les clés possibles
+// Calcul et agrégation des statistiques par comédien (uniquement les doubleurs VFQ)
 const comediensStats = computed(() => {
   if (!rawMovies.value || !Array.isArray(rawMovies.value)) return []
 
@@ -21,10 +21,9 @@ const comediensStats = computed(() => {
     if (Array.isArray(castList)) {
       castList.forEach(c => {
         let doubleur = ''
-        if (typeof c === 'string') {
-          doubleur = c
-        } else if (c && typeof c === 'object') {
-          doubleur = c.doubleVFQ || c.double_vfq || c.doubleur || c.nom || c.name || c.actor || c.voix
+        if (typeof c === 'object' && c !== null) {
+          // Extraction exclusive des propriétés liées au doubleur VFQ (en ignorant les acteurs originaux)
+          doubleur = c.doubleVFQ || c.double_vfq || c.doubleur || c.doubleur_vfq || c.voix
         }
         
         if (doubleur && typeof doubleur === 'string') {

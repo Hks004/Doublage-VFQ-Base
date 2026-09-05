@@ -50,7 +50,7 @@ const groupedPerformances = computed(() => {
       if (cleanedActor && (cleanedActor === targetName || cleanedActor.includes(targetName))) {
         const vfqName = c.doubleVFQ || c.double_vfq || c.voice || c.doubleur_vfq || c.doubleur || 'Non crédité'
         const movieTitle = film.translated_name || c.movie_title || 'Titre inconnu'
-        const movieId = film.id
+        const movieId = film.movie_id
         const characterRole = c.role || c.character || '—'
         
         let releaseYear = 'N/A'
