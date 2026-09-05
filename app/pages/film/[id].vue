@@ -9,10 +9,12 @@ const { allMovies: allMoviesCatalog, loading, fetchMovies } = useVfqMovies()
 
 await fetchMovies()
 
+const getMovieId = (m) => m.movie_id || m.id || m._id
+
 // Recherche du film dans le catalogue global chargé en mémoire
 const movie = computed(() => {
   if (!allMoviesCatalog.value || !Array.isArray(allMoviesCatalog.value)) return null
-  return allMoviesCatalog.value.find(m => String(m.id) === String(movieId.value)) || null
+  return allMoviesCatalog.value.find(m => String(getMovieId(m)) === String(movieId.value)) || null
 })
 
 // Extraction propre du casting (gère cast_data ou cast)

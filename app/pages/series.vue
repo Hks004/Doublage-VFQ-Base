@@ -18,6 +18,8 @@ const { allMovies, loading, fetchMovies } = useVfqMovies()
 
 await fetchMovies()
 
+const getMovieId = (m) => m.movie_id || m.id || m._id
+
 const isSeriesProject = (m) => {
   const type = m.project_type || m.projectType || m.extra?.projectType || m.extra_data?.projectType
   if (!type) return false
@@ -156,7 +158,7 @@ useHead({
           <div class="select-group">
             <label>Ordre</label>
             <select v-model="sortType">
-              <option value="default">Par défaut (Premier au dernier)</option>
+              <option value="default">Par défaut</option>
               <option value="recent">Ajouts récents</option>
               <option value="vfq">A-Z (VFQ)</option>
               <option value="original">A-Z (Original)</option>
@@ -173,8 +175,8 @@ useHead({
       </div>
 
       <div class="titles-grid">
-        <div v-for="movie in movies" :key="movie.id" class="movie-card">
-          <NuxtLink :to="'/film/' + movie.id" class="poster-link" draggable="false">
+        <div v-for="movie in movies" :key="getMovieId(movie)" class="movie-card">
+          <NuxtLink :to="'/film/' + getMovieId(movie)" class="poster-link" draggable="false">
             <div class="poster-wrapper">
               <img v-if="getPoster(movie)" :src="getPoster(movie)" loading="lazy" draggable="false" :alt="movie.translated_name || movie.translatedName" />
               <div v-else class="placeholder"><span>VFQ</span></div>
@@ -185,7 +187,7 @@ useHead({
             </div>
           </NuxtLink>
 
-          <div class="info" @mouseup="navigateIfNoSelection(movie.id)">
+          <div class="info" @mouseup="navigateIfNoSelection(getMovieId(movie))">
             <h3 draggable="false">{{ movie.translated_name || movie.translatedName }}</h3>
             <p class="original-name" draggable="false">{{ movie.original_name || movie.originalName || movie.extra?.originalName || movie.extra_data?.originalName || '' }}</p>
           </div>

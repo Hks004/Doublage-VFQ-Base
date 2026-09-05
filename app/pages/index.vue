@@ -65,7 +65,7 @@ const navigateSafely = (e, route) => {
   }
 }
 
-const getMovieId = (m) => m.id || m._id
+const getMovieId = (m) => m.movie_id || m.id || m._id
 const getTranslatedName = (m) => m.translated_name || m.translatedName || m.title || 'Titre inconnu'
 const getOriginalName = (m) => m.original_name || m.originalName || m.originalTitle || ''
 const getReleaseDate = (m) => m.theatrical_release || m.release_year || m.extra_data?.theatricalRelease || m.extra?.theatricalRelease || ''

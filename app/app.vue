@@ -210,7 +210,8 @@ const selectPerson = (name, type) => {
               </div>
               <div v-if="liveResults.movies.length > 0" class="search-section">
                 <div class="section-label">Films & Séries</div>
-                <div v-for="movie in liveResults.movies" :key="movie.id" class="dropdown-item" @click="selectMovie(movie.id)">
+                <!-- Utilisation de movie.movie_id au lieu de movie.id -->
+                <div v-for="movie in liveResults.movies" :key="movie.movie_id" class="dropdown-item" @click="selectMovie(movie.movie_id)">
                   <img v-if="movie.poster_path" :src="getPosterUrl(movie.poster_path)" class="item-poster">
                   <div v-else class="item-poster-placeholder">VFQ</div>
                   <div class="item-info">
