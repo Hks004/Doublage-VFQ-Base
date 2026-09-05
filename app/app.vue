@@ -8,6 +8,9 @@ const showResults = ref(false)
 const searchWrapper = ref(null)
 const isMenuOpen = ref(false)
 
+// Variable pour gérer l'affichage de l'écran de chargement initial
+const isInitialLoading = ref(true)
+
 const toggleMenu = () => { isMenuOpen.value = !isMenuOpen.value }
 const closeMenu = () => { isMenuOpen.value = false }
 
@@ -20,11 +23,14 @@ const handleClickOutside = (event) => {
 onMounted(async () => {
   window.addEventListener('click', handleClickOutside)
 
-  // Si le useState est déjà rempli, on ne fait rien
-  if (allData.value && allData.value.length > 0) return
-
-  // On télécharge la base complète en arrière-plan (sans saturer le localStorage)
   try {
+    // Si le useState est déjà rempli, on coupe direct le chargement
+    if (allData.value && allData.value.length > 0) {
+      isInitialLoading.value = false
+      return
+    }
+
+    // On télécharge la base complète en arrière-plan
     let allRows = []
     let page = 0
     const pageSize = 1000
@@ -53,6 +59,9 @@ onMounted(async () => {
     allData.value = allRows
   } catch (error) {
     console.error("Erreur de chargement Supabase:", error)
+  } finally {
+    // Dans tous les cas (succès ou erreur), on retire l'écran de chargement
+    isInitialLoading.value = false
   }
 })
 
@@ -152,7 +161,16 @@ const selectPerson = (name, type) => {
 </script>
 
 <template>
-  <div id="layout">
+  <!-- Écran de chargement global pendant la récupération initiale -->
+  <div v-if="isInitialLoading" class="initial-loading-screen">
+    <div class="loader-content">
+      <div class="spinner"></div>
+      <p>🎬 Chargement de la base de données...</p>
+    </div>
+  </div>
+
+  <!-- Le site normal s'affiche une fois le chargement terminé -->
+  <div id="layout" v-else>
     <nav class="nav">
       <div class="nav-content">
         <div class="nav-header">
@@ -251,6 +269,35 @@ const selectPerson = (name, type) => {
 body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Inter', sans-serif; }
 #layout { display: flex; flex-direction: column; min-height: 100vh; }
 .main-container { flex: 1; }
+
+/* Styles pour l'écran de chargement initial */
+.initial-loading-screen {
+  min-height: 100vh;
+  background-color: var(--bg);
+  color: var(--text);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+.loader-content {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #818cf8;
+}
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 4px solid #222;
+  border-top: 4px solid var(--primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+@keyframes spin { 100% { transform: rotate(360deg); } }
 
 .nav { height: 70px; background: var(--nav-bg); border-bottom: 1px solid #262626; position: sticky; top: 0; z-index: 1000; display: flex; align-items: center; }
 .nav-content { max-width: 1400px; margin: 0 auto; width: 100%; padding: 0 20px; display: flex; align-items: center; justify-content: space-between; position: relative; }
