@@ -144,7 +144,7 @@ const loading = ref(false)
 const successMessage = ref('')
 const errorMessage = ref('')
 
-// Fonction utilitaire pour formater les noms propres (Title Case gérant les tirets)
+// Fonction utilitaire pour formater les noms propres (gère les espaces, les tirets et les apostrophes)
 const capitalizeName = (str) => {
   if (!str) return ''
   return str
@@ -153,7 +153,11 @@ const capitalizeName = (str) => {
     .split(' ')
     .map(word => {
       return word.split('-')
-        .map(part => part.charAt(0).toUpperCase() + part.slice(1))
+        .map(part => {
+          return part.split("'")
+            .map(subPart => subPart.charAt(0).toUpperCase() + subPart.slice(1))
+            .join("'")
+        })
         .join('-')
     })
     .join(' ')
