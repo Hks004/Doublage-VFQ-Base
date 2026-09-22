@@ -28,7 +28,7 @@ onMounted(async () => {
   try {
     let allRows = []
     let page = 0
-    const pageSize = 1000
+    const pageSize = 2500
     let fetchMore = true
 
     while (fetchMore) {
