@@ -9,11 +9,10 @@ const showResults = ref(false)
 const searchWrapper = ref(null)
 const isMenuOpen = ref(false)
 
-// ÉTAPE CLÉ : Si le localStorage a déjà du cache, on désactive l'écran de chargement instantanément.
-// Sinon (première visite), on l'affiche le temps de télécharger.
+// Si le localStorage a du cache, on désactive l'écran de chargement instantanément
 const isInitialLoading = ref(process.client ? !localStorage.getItem('vfq_movies_cache') : true)
 
-// Si on a déjà du cache au démarrage, on le charge tout de suite dans allData pour que tout s'affiche direct
+// Lecture immédiate du cache allégé au démarrage
 if (process.client) {
   try {
     const cachedData = localStorage.getItem('vfq_movies_cache')
@@ -40,7 +39,7 @@ const handleClickOutside = (event) => {
 onMounted(async () => {
   window.addEventListener('click', handleClickOutside)
 
-  // On télécharge la version la plus fraîche depuis Supabase en arrière-plan (en silence)
+  // Téléchargement depuis Supabase en arrière-plan pour garder les données à jour
   try {
     let allRows = []
     let page = 0
@@ -69,15 +68,27 @@ onMounted(async () => {
 
     if (allRows.length > 0) {
       allData.value = allRows
-      // On met à jour le localStorage pour la prochaine visite
+      
+      // On sauvegarde une version allégée pour éviter l'erreur de quota (5 Mo max)
       if (process.client) {
-        localStorage.setItem('vfq_movies_cache', JSON.stringify(allRows))
+        try {
+          const lightRows = allRows.map(m => ({
+            movie_id: m.movie_id,
+            translated_name: m.translated_name,
+            original_name: m.original_name,
+            project_type: m.project_type,
+            poster_path: m.poster_path,
+            cast_data: m.cast_data || m.cast || m.casting
+          }))
+          localStorage.setItem('vfq_movies_cache', JSON.stringify(lightRows))
+        } catch (storageError) {
+          console.error("Erreur écriture localStorage:", storageError)
+        }
       }
     }
   } catch (error) {
     console.error("Erreur de chargement Supabase:", error)
   } finally {
-    // Dans tous les cas, on s'assure que l'écran de chargement initial se retire
     isInitialLoading.value = false
   }
 })
@@ -178,7 +189,6 @@ const selectPerson = (name, type) => {
 </script>
 
 <template>
-  <!-- Écran de chargement global (uniquement visible à la toute première visite) -->
   <div v-if="isInitialLoading" class="initial-loading-screen">
     <div class="loader-content">
       <div class="spinner"></div>
@@ -186,7 +196,6 @@ const selectPerson = (name, type) => {
     </div>
   </div>
 
-  <!-- Le site normal s'affiche immédiatement si le cache existe -->
   <div id="layout" v-else>
     <nav class="nav">
       <div class="nav-content">
@@ -287,7 +296,6 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: 'Inter
 #layout { display: flex; flex-direction: column; min-height: 100vh; }
 .main-container { flex: 1; }
 
-/* Styles pour l'écran de chargement initial */
 .initial-loading-screen {
   min-height: 100vh;
   background-color: var(--bg);
