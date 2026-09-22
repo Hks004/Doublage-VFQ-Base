@@ -51,7 +51,7 @@ export const useVfqMovies = () => {
   const hasLoaded = useState('vfq-movies-loaded', () => false)
 
   const fetchMovies = async (forceRefresh = false) => {
-    // 1. Si la mémoire est vide, on va cherché synchrone/await dans IndexedDB en premier
+    // 1. Si la mémoire est vide, on va chercher async/await dans IndexedDB en premier
     if (!forceRefresh && movies.value.length === 0 && process.client) {
       const cachedData = await getFromIDB('vfq_movies_data')
       if (cachedData && cachedData.length > 0) {
@@ -60,15 +60,30 @@ export const useVfqMovies = () => {
       }
     }
 
-    // 2. Si on a maintenant les données, on fait la vérification HEAD ultra-légère
-    if (!forceRefresh && hasLoaded.value && movies.value.length > 0) {
+    // 2. Vérification TTL (30 minutes) + HEAD ultra-légère vers Supabase
+    if (!forceRefresh && hasLoaded.value && movies.value.length > 0 && process.client) {
+      const lastCheck = localStorage.getItem('vfq_vfq_last_check')
+      const now = Date.now()
+      const THIRTY_MINUTES = 30 * 60 * 1000
+
+      // Si vérifié il y a moins de 30 minutes, on skip totalement Supabase !
+      if (lastCheck && (now - parseInt(lastCheck)) < THIRTY_MINUTES) {
+        return 
+      }
+
       try {
         const { count, error } = await supabase
           .from('fiches_vfq')
           .select('*', { count: 'exact', head: true })
 
         if (!error && count === movies.value.length) {
+          // On met à jour le timestamp de la dernière vérification réussie
+          localStorage.setItem('vfq_vfq_last_check', now.toString())
           return // Cache validé, 0 Mo téléchargé !
+        } else if (!error) {
+          // Si le nombre de lignes a changé, on met à jour le timestamp 
+          // et on laisse le code continuer pour re-télécharger le catalogue frais.
+          localStorage.setItem('vfq_vfq_last_check', now.toString())
         }
       } catch (e) {
         return 
@@ -105,9 +120,10 @@ export const useVfqMovies = () => {
       movies.value = allRows
       hasLoaded.value = true
 
-      // 3. Sauvegarde dans IndexedDB
+      // 3. Sauvegarde dans IndexedDB et actualisation du TTL
       if (process.client) {
         await setToIDB('vfq_movies_data', allRows)
+        localStorage.setItem('vfq_vfq_last_check', Date.now().toString())
       }
 
     } catch (err) {
