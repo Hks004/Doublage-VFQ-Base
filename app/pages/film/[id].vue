@@ -42,7 +42,7 @@ useHead(() => ({
 
 <template>
   <!-- S'affiche instantanément si le film est trouvé dans le catalogue -->
-  <div class="page-detail" v-if="!loading && movie">
+  <div class="page-detail" v-if="movie">
     <div class="nav-container">
       <a href="#" @click.prevent="goBack" class="back-link">← RETOUR</a>
     </div>
@@ -149,10 +149,10 @@ useHead(() => ({
       </div>
     </div>
   </div>
-  <!-- Chargement global -->
+  <!-- Chargement global ou de la fiche -->
   <div v-else-if="loading" class="loader">
     <div class="spinner"></div>
-    <p>Chargement...</p>
+    <p>Chargement de la fiche...</p>
   </div>
   <!-- Si le chargement est terminé mais que le film n'existe pas -->
   <div v-else class="loader">
