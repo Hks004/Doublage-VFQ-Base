@@ -9,23 +9,8 @@ const showResults = ref(false)
 const searchWrapper = ref(null)
 const isMenuOpen = ref(false)
 
-// Si le localStorage a du cache, on désactive l'écran de chargement instantanément
-const isInitialLoading = ref(process.client ? !localStorage.getItem('vfq_movies_cache') : true)
-
-// Lecture immédiate du cache allégé au démarrage
-if (process.client) {
-  try {
-    const cachedData = localStorage.getItem('vfq_movies_cache')
-    if (cachedData) {
-      const parsed = JSON.parse(cachedData)
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        allData.value = parsed
-      }
-    }
-  } catch (e) {
-    console.error("Erreur de lecture du cache localStorage:", e)
-  }
-}
+// L'écran de chargement s'affiche à chaque visite le temps de tout récupérer proprement
+const isInitialLoading = ref(true)
 
 const toggleMenu = () => { isMenuOpen.value = !isMenuOpen.value }
 const closeMenu = () => { isMenuOpen.value = false }
@@ -39,11 +24,11 @@ const handleClickOutside = (event) => {
 onMounted(async () => {
   window.addEventListener('click', handleClickOutside)
 
-  // Téléchargement depuis Supabase en arrière-plan pour garder les données à jour
+  // Téléchargement propre depuis Supabase à chaque chargement de page
   try {
     let allRows = []
     let page = 0
-    const pageSize = 1000
+    const pageSize = 2500
     let fetchMore = true
 
     while (fetchMore) {
@@ -66,26 +51,7 @@ onMounted(async () => {
       }
     }
 
-    if (allRows.length > 0) {
-      allData.value = allRows
-      
-      // On sauvegarde une version allégée pour éviter l'erreur de quota (5 Mo max)
-      if (process.client) {
-        try {
-          const lightRows = allRows.map(m => ({
-            movie_id: m.movie_id,
-            translated_name: m.translated_name,
-            original_name: m.original_name,
-            project_type: m.project_type,
-            poster_path: m.poster_path,
-            cast_data: m.cast_data || m.cast || m.casting
-          }))
-          localStorage.setItem('vfq_movies_cache', JSON.stringify(lightRows))
-        } catch (storageError) {
-          console.error("Erreur écriture localStorage:", storageError)
-        }
-      }
-    }
+    allData.value = allRows
   } catch (error) {
     console.error("Erreur de chargement Supabase:", error)
   } finally {
