@@ -1,4 +1,3 @@
-// Petit helper natif pour gérer IndexedDB (totalement compatible GitHub Pages)
 const openDB = () => {
   return new Promise((resolve, reject) => {
     if (!process.client) return reject(new Error('SSR'))
@@ -51,18 +50,17 @@ export const useVfqMovies = () => {
   const isLoading = useState('vfq-movies-loading', () => false)
   const hasLoaded = useState('vfq-movies-loaded', () => false)
 
-  // 1. Au démarrage, on va chercher discrètement dans IndexedDB
-  if (process.client && movies.value.length === 0) {
-    getFromIDB('vfq_movies_data').then((cachedData) => {
+  const fetchMovies = async (forceRefresh = false) => {
+    // 1. Si la mémoire est vide, on va cherché synchrone/await dans IndexedDB en premier
+    if (!forceRefresh && movies.value.length === 0 && process.client) {
+      const cachedData = await getFromIDB('vfq_movies_data')
       if (cachedData && cachedData.length > 0) {
         movies.value = cachedData
         hasLoaded.value = true
       }
-    })
-  }
+    }
 
-  const fetchMovies = async (forceRefresh = false) => {
-    // Si déjà chargé, on fait la vérification HEAD ultra-légère
+    // 2. Si on a maintenant les données, on fait la vérification HEAD ultra-légère
     if (!forceRefresh && hasLoaded.value && movies.value.length > 0) {
       try {
         const { count, error } = await supabase
@@ -70,7 +68,7 @@ export const useVfqMovies = () => {
           .select('*', { count: 'exact', head: true })
 
         if (!error && count === movies.value.length) {
-          return // Cache validé, 0 Mo téléchargé sur Supabase !
+          return // Cache validé, 0 Mo téléchargé !
         }
       } catch (e) {
         return 
@@ -107,7 +105,7 @@ export const useVfqMovies = () => {
       movies.value = allRows
       hasLoaded.value = true
 
-      // 2. On sauvegarde les 13 Mo dans IndexedDB (qui accepte des Go sans saturer)
+      // 3. Sauvegarde dans IndexedDB
       if (process.client) {
         await setToIDB('vfq_movies_data', allRows)
       }
