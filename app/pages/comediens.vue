@@ -2,7 +2,7 @@
 const router = useRouter()
 
 const sortType = useState('vfq_comediens_sort', () => 'az')
-const displayLimit = ref(40)
+const displayLimit = useState('catalog_display_limit_series', () => 40)
 
 // Utilisation du composable global unifié pour récupérer toute la base
 const { allMovies: rawMovies, loading, fetchMovies } = useVfqMovies()

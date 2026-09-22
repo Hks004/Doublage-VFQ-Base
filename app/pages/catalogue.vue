@@ -6,7 +6,7 @@ const router = useRouter()
 const sortType = useState('vfq_catalog_sort', () => 'default')
 const selectedYear = useState('vfq_catalog_year', () => '')
 
-const displayLimit = ref(40)
+const displayLimit = useState('catalog_display_limit_catalogue', () => 40)
 
 // On utilise ton composable avec import explicite pour éviter tout problème d'auto-import
 const { allMovies, loading, fetchMovies } = useVfqMovies()

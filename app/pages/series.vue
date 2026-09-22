@@ -1,20 +1,13 @@
 <script setup>
 const router = useRouter()
 
-const sortType = useState('vfq_series_sort', () => 'default') 
+const sortType = useState('vfq_series_sort', () => 'default')
 const selectedYear = useState('vfq_series_year', () => '')
 
-const movies = ref([])
-const totalCount = ref(0)
-const loadingMore = ref(false)
-const page = ref(0)
-const pageSize = 60
-const hasMore = ref(true)
-const sentinel = ref(null)
+const displayLimit = useState('catalog_display_limit_series', () => 40)
 
-// On utilise le composable global unifié pour récupérer tous les films, 
-// tout en filtrant instantanément sur les séries télé
-const { allMovies, loading, fetchMovies } = useVfqMovies()
+// Utilisation du composable centralisé pour récupérer la base complète en cache
+const { allMovies: rawMovies, loading, fetchMovies } = useVfqMovies()
 
 await fetchMovies()
 
@@ -33,10 +26,18 @@ const isSeriesProject = (m) => {
   return str.includes('serie') || str.includes('tv')
 }
 
-const allSeries = computed(() => {
-  if (!allMovies.value || !Array.isArray(allMovies.value)) return []
-  return allMovies.value.filter(m => isSeriesProject(m))
+// Filtrage instantané des séries depuis les données globales partagées
+const allMovies = computed(() => {
+  if (!rawMovies.value || !Array.isArray(rawMovies.value)) return []
+  return rawMovies.value.filter(m => isSeriesProject(m))
 })
+
+const navigateIfNoSelection = (movieId) => {
+  const selection = window.getSelection().toString()
+  if (!selection) {
+    router.push('/film/' + movieId)
+  }
+}
 
 const extractYear = (m) => {
   if (m.release_year) return String(m.release_year)
@@ -48,14 +49,21 @@ const extractYear = (m) => {
   return match ? match[0] : null
 }
 
-const processedSeries = computed(() => {
-  if (!allSeries.value) return []
-  let list = [...allSeries.value]
-  
-  if (selectedYear.value !== '') {
-    list = list.filter(m => String(extractYear(m)) === String(selectedYear.value))
-  }
+const availableYears = computed(() => {
+  if (!allMovies.value) return []
+  const years = allMovies.value
+    .map(m => extractYear(m))
+    .filter(y => y !== null)
+  return [...new Set(years)].sort((a, b) => b - a)
+})
 
+const filtered = computed(() => {
+  if (!allMovies.value) return []
+  let list = allMovies.value.filter(m => {
+    const year = extractYear(m)
+    return selectedYear.value === '' || String(year) === String(selectedYear.value)
+  })
+  
   if (sortType.value === 'default') {
     list.sort((a, b) => Number(a.id) - Number(b.id))
   } else if (sortType.value === 'recent') {
@@ -76,69 +84,46 @@ const processedSeries = computed(() => {
   return list
 })
 
-const updateDisplayedMovies = (reset = false) => {
-  if (reset) {
-    page.value = 0
-  }
-  const filtered = processedSeries.value
-  totalCount.value = filtered.length
-  const end = (page.value + 1) * pageSize
-  
-  movies.value = filtered.slice(0, end)
-  hasMore.value = movies.value.length < filtered.length
-}
-
-// Initialisation de l'affichage en fonction des données filtrées
-updateDisplayedMovies(true)
-
-watch([sortType, selectedYear, allSeries], () => {
-  updateDisplayedMovies(true)
-})
-
-onMounted(() => {
-  const observer = new IntersectionObserver((entries) => {
-    if (entries[0].isIntersecting && hasMore.value && !loading.value && !loadingMore.value) {
-      loadMore()
-    }
-  }, { rootMargin: '200px' })
-
-  if (sentinel.value) {
-    observer.observe(sentinel.value)
-  }
-
-  onUnmounted(() => {
-    if (sentinel.value) observer.unobserve(sentinel.value)
-  })
+const visibleItems = computed(() => {
+  return filtered.value.slice(0, displayLimit.value)
 })
 
 const loadMore = () => {
-  if (loadingMore.value || !hasMore.value || loading.value) return
-  loadingMore.value = true
-  page.value++
-  updateDisplayedMovies(false)
-  loadingMore.value = false
-}
-
-const navigateIfNoSelection = (movieId) => {
-  const selection = window.getSelection().toString()
-  if (!selection) {
-    router.push('/film/' + movieId)
+  if (displayLimit.value < filtered.value.length) {
+    displayLimit.value += 40
   }
 }
+
+const handleScroll = () => {
+  const scrollHeight = document.documentElement.scrollHeight
+  const scrollTop = document.documentElement.scrollTop
+  const clientHeight = window.innerHeight
+  
+  if (scrollTop + clientHeight >= scrollHeight - 600) { 
+    loadMore()
+  }
+}
+
+watch([sortType, selectedYear], () => {
+  displayLimit.value = 40
+  if (process.client) {
+    window.scrollTo(0, 0)
+  }
+})
+
+onMounted(() => {
+  window.addEventListener('scroll', handleScroll)
+})
+
+onUnmounted(() => {
+  window.removeEventListener('scroll', handleScroll)
+})
 
 const getPoster = (m) => {
   const baseUrl = 'https://image.tmdb.org/t/p/w342'
   const path = m.poster_path || m.posterPath || m.extra?.posterPath || m.extra_data?.posterPath
   return path ? (baseUrl + path) : null
 }
-
-const availableYears = computed(() => {
-  if (!allSeries.value) return []
-  const years = allSeries.value
-    .map(m => extractYear(m))
-    .filter(y => y !== null)
-  return [...new Set(years)].sort((a, b) => b - a)
-})
 
 useHead({
   title: 'Séries Télé VFQ - Doublage Québec'
@@ -151,7 +136,7 @@ useHead({
       <div class="header-section">
         <div class="title-area">
           <h1>Séries Télé</h1>
-          <p class="count">{{ totalCount }} titres répertoriés</p>
+          <p class="count">{{ filtered.length }} titres répertoriés</p>
         </div>
         
         <div class="controls">
@@ -175,43 +160,42 @@ useHead({
       </div>
 
       <div class="titles-grid">
-        <div v-for="movie in movies" :key="getMovieId(movie)" class="movie-card">
-          <NuxtLink :to="'/film/' + getMovieId(movie)" class="poster-link" draggable="false">
+        <div v-for="m in visibleItems" :key="getMovieId(m)" class="movie-card">
+          <NuxtLink :to="'/film/' + getMovieId(m)" class="poster-link" draggable="false">
             <div class="poster-wrapper">
-              <img v-if="getPoster(movie)" :src="getPoster(movie)" loading="lazy" draggable="false" :alt="movie.translated_name || movie.translatedName" />
+              <img v-if="getPoster(m)" :src="getPoster(m)" loading="lazy" draggable="false" :alt="m.translated_name || m.translatedName" />
               <div v-else class="placeholder"><span>VFQ</span></div>
-              
               <div class="overlay-mobile">
-                <span class="year-label">{{ extractYear(movie) || '----' }}</span>
+                <span class="year-label">{{ extractYear(m) || '----' }}</span>
               </div>
             </div>
           </NuxtLink>
 
-          <div class="info" @mouseup="navigateIfNoSelection(getMovieId(movie))">
-            <h3 draggable="false">{{ movie.translated_name || movie.translatedName }}</h3>
-            <p class="original-name" draggable="false">{{ movie.original_name || movie.originalName || movie.extra?.originalName || movie.extra_data?.originalName || '' }}</p>
+          <div class="info" @mouseup="navigateIfNoSelection(getMovieId(m))">
+            <h3 draggable="false">{{ m.translated_name || m.translatedName }}</h3>
+            <p class="original-name" draggable="false">{{ m.original_name || m.originalName || m.extra?.originalName || m.extra_data?.originalName || '' }}</p>
           </div>
         </div>
       </div>
 
-      <div ref="sentinel" class="scroll-sentinel">
-        <p v-if="loadingMore" class="loading-more-text">Chargement de la suite...</p>
+      <div v-if="displayLimit < filtered.length" class="loader-scrolling">
+        Chargement de la suite...
       </div>
     </div>
   </div>
-  <div v-else class="loader">Chargement des séries...</div>
+  <div v-else class="loader">Chargement...</div>
 </template>
 
 <style scoped>
 .centered-wrapper { max-width: 1400px; margin: 0 auto; padding: 40px 20px; }
-.header-section { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 50px; border-left: 4px solid var(--primary); padding-left: 20px; }
+.header-section { display: flex; justify-content: space-between; align-items: flex-end; margin-bottom: 50px; border-left: 4px solid var(--primary, #2563eb); padding-left: 20px; }
 .title-area h1 { font-size: 3rem; font-weight: 900; margin: 0; text-transform: none; color: #fff; }
 .count { color: #666; font-weight: 800; font-size: 0.9rem; margin-top: 5px; }
 
 .controls { display: flex; gap: 20px; }
 .select-group { display: flex; flex-direction: column; gap: 8px; }
 .select-group label { font-size: 0.7rem; text-transform: none; color: #666; font-weight: 800; letter-spacing: 1px; }
-select { background: #1a1a1a; color: #fff; border: 1px solid #333; padding: 10px 15px; border-radius: 8px; min-width: 180px; outline: none; font-weight: 600; }
+select { background: #1a1a1a; color: #fff; border: 1px solid #333; padding: 10px 15px; border-radius: 8px; min-width: 180px; outline: none; font-weight: 600; cursor: pointer; }
 
 .titles-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 30px 20px; }
 .movie-card { display: flex; flex-direction: column; min-width: 0; }
@@ -225,7 +209,7 @@ select { background: #1a1a1a; color: #fff; border: 1px solid #333; padding: 10px
 .placeholder span { font-size: 2rem; color: #262626; font-weight: 900; letter-spacing: -1px; }
 
 .overlay-mobile { position: absolute; bottom: 5px; left: 5px; z-index: 2; }
-.year-label { color: #fff; font-weight: 900; font-size: 0.6rem; background: var(--primary); padding: 2px 5px; border-radius: 3px; }
+.year-label { color: #fff; font-weight: 900; font-size: 0.6rem; background: var(--primary, #2563eb); padding: 2px 5px; border-radius: 3px; }
 
 .info { margin-top: 8px; cursor: pointer; }
 .info h3 { 
@@ -239,26 +223,20 @@ select { background: #1a1a1a; color: #fff; border: 1px solid #333; padding: 10px
 }
 
 .movie-card:hover .original-name { color: #ccc; }
-.movie-card:hover h3 { color: var(--primary); }
+.movie-card:hover h3 { color: var(--primary, #2563eb); }
 
-.scroll-sentinel { height: 60px; text-align: center; margin-top: 30px; }
-.loading-more-text { color: var(--primary); font-weight: 800; font-size: 0.9rem; }
+.loader { text-align: center; padding: 100px; color: var(--primary, #2563eb); font-weight: 800; }
+.loader-scrolling { text-align: center; padding: 40px; color: #444; font-weight: 800; font-size: 0.8rem; text-transform: none; letter-spacing: 2px; }
 
-.loader { text-align: center; padding: 100px; color: var(--primary); font-weight: 800; }
-
-/* --- RESPONSIVE --- */
-@media (max-width: 1100px) { .titles-grid { grid-template-columns: repeat(4, 1fr); } }
-@media (max-width: 850px) {
-  .header-section { flex-direction: column; align-items: flex-start; gap: 20px; }
-  .controls { width: 100%; }
-  .select-group { flex: 1; }
-  select { min-width: 0; width: 100%; }
-  .titles-grid { grid-template-columns: repeat(3, 1fr); }
-}
-@media (max-width: 600px) {
+@media (max-width: 1000px) { .titles-grid { grid-template-columns: repeat(4, 1fr); gap: 20px 12px; } .title-area h1 { font-size: 2.2rem; } }
+@media (max-width: 700px) {
   .centered-wrapper { padding: 20px 10px; }
+  .header-section { flex-direction: column; align-items: flex-start; gap: 15px; margin-bottom: 25px; }
   .title-area h1 { font-size: 1.8rem; }
-  .titles-grid { grid-template-columns: repeat(3, 1fr) !important; gap: 15px 8px; }
-  .info h3 { font-size: 0.75rem; }
+  .controls { width: 100%; gap: 10px; }
+  .select-group { flex: 1; }
+  select { min-width: 0; width: 100%; padding: 8px; font-size: 0.75rem; }
+  .titles-grid { grid-template-columns: repeat(3, 1fr); gap: 15px 8px; }
 }
+@media (max-width: 450px) { .info h3 { font-size: 0.7rem; } .titles-grid { gap: 10px 6px; } }
 </style>

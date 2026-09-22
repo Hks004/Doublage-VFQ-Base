@@ -9,9 +9,14 @@ export default defineNuxtConfig({
   app: {
     baseURL: '/Doublage-VFQ-Base/',
     buildAssetsDir: '_nuxt/',
+    head: {
+      link: [
+        { rel: 'icon', type: 'image/x-icon', href: '/Doublage-VFQ-Base/favicon.ico' }
+      ]
+    }
   },
 
   supabase: {
-    redirect: false // Désactive la redirection automatique si l'utilisateur n'est pas connecté
+    redirect: false
   }
 })

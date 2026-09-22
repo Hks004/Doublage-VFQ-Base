@@ -4,7 +4,7 @@ const router = useRouter()
 const sortType = useState('vfq_animation_sort', () => 'default')
 const selectedYear = useState('vfq_animation_year', () => '')
 
-const displayLimit = ref(40)
+const displayLimit = useState('catalog_display_limit_series', () => 40)
 
 // Utilisation du composable centralisé pour récupérer la base complète en cache
 const { allMovies: rawMovies, loading, fetchMovies } = useVfqMovies()
