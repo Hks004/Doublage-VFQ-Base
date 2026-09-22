@@ -11,8 +11,16 @@ const displayLimit = useState('catalog_display_limit_catalogue', () => 40)
 // On utilise ton composable avec import explicite pour éviter tout problème d'auto-import
 const { allMovies, loading, fetchMovies } = useVfqMovies()
 
-// Chargement initial (instantané si déjà en mémoire, charge en arrière-plan ou affiche le loader si F5)
-await fetchMovies()
+// Chargement non bloquant au montage (évite l'écran noir au F5 et gère le cache intelligemment)
+onMounted(() => {
+  if (!allMovies.value || allMovies.value.length === 0) {
+    fetchMovies()
+  } else {
+    // Même si le cache est là, on lance un fetch en arrière-plan (HEAD count ultra-léger) au cas où la base a bougé
+    fetchMovies()
+  }
+  window.addEventListener('scroll', handleScroll)
+})
 
 const getMovieId = (m) => m.movie_id || m.id || m._id
 
@@ -93,10 +101,6 @@ watch([sortType, selectedYear], () => {
   if (process.client) {
     window.scrollTo(0, 0)
   }
-})
-
-onMounted(() => {
-  window.addEventListener('scroll', handleScroll)
 })
 
 onUnmounted(() => {

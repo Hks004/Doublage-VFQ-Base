@@ -2,12 +2,20 @@
 const router = useRouter()
 
 const sortType = useState('vfq_comediens_sort', () => 'az')
-const displayLimit = useState('catalog_display_limit_series', () => 40)
+const displayLimit = useState('catalog_display_limit_comediens', () => 40)
 
 // Utilisation du composable global unifié pour récupérer toute la base
 const { allMovies: rawMovies, loading, fetchMovies } = useVfqMovies()
 
-await fetchMovies()
+// Chargement non bloquant au montage (évite l'écran noir au F5)
+onMounted(() => {
+  if (!rawMovies.value || rawMovies.value.length === 0) {
+    fetchMovies()
+  } else {
+    fetchMovies() // Vérification en arrière-plan
+  }
+  window.addEventListener('scroll', handleScroll)
+})
 
 // Calcul et agrégation des statistiques par comédien (uniquement les doubleurs VFQ)
 const comediensStats = computed(() => {
@@ -79,10 +87,6 @@ watch(sortType, () => {
   if (process.client) {
     window.scrollTo(0, 0)
   }
-})
-
-onMounted(() => {
-  window.addEventListener('scroll', handleScroll)
 })
 
 onUnmounted(() => {

@@ -4,12 +4,20 @@ const router = useRouter()
 const sortType = useState('vfq_animation_sort', () => 'default')
 const selectedYear = useState('vfq_animation_year', () => '')
 
-const displayLimit = useState('catalog_display_limit_series', () => 40)
+const displayLimit = useState('catalog_display_limit_animation', () => 40)
 
 // Utilisation du composable centralisé pour récupérer la base complète en cache
 const { allMovies: rawMovies, loading, fetchMovies } = useVfqMovies()
 
-await fetchMovies()
+// Chargement non bloquant au montage (évite l'écran noir au F5)
+onMounted(() => {
+  if (!rawMovies.value || rawMovies.value.length === 0) {
+    fetchMovies()
+  } else {
+    fetchMovies() // Vérification en arrière-plan
+  }
+  window.addEventListener('scroll', handleScroll)
+})
 
 const getMovieId = (m) => m.movie_id || m.id || m._id
 
@@ -106,10 +114,6 @@ watch([sortType, selectedYear], () => {
   if (process.client) {
     window.scrollTo(0, 0)
   }
-})
-
-onMounted(() => {
-  window.addEventListener('scroll', handleScroll)
 })
 
 onUnmounted(() => {

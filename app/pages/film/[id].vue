@@ -1,4 +1,6 @@
 <script setup>
+import { useVfqMovies } from '@/composables/useVfqMovies'
+
 const route = useRoute()
 const router = useRouter()
 
@@ -7,7 +9,14 @@ const movieId = computed(() => route.params.id)
 // Utilisation du composable global unifié
 const { allMovies: allMoviesCatalog, loading, fetchMovies } = useVfqMovies()
 
-await fetchMovies()
+// Chargement non bloquant au montage (évite l'écran noir au F5)
+onMounted(() => {
+  if (!allMoviesCatalog.value || allMoviesCatalog.value.length === 0) {
+    fetchMovies()
+  } else {
+    fetchMovies() // Vérification en arrière-plan
+  }
+})
 
 const getMovieId = (m) => m.movie_id || m.id || m._id
 

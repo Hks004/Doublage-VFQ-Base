@@ -22,7 +22,14 @@ watch(() => route.params.name, () => {
 // Utilisation du composable global unifié pour s'assurer du chargement et du cache
 const { allMovies: allMoviesCatalog, loading, fetchMovies } = useVfqMovies()
 
-await fetchMovies()
+// Chargement non bloquant au montage (évite l'écran noir au F5)
+onMounted(() => {
+  if (!allMoviesCatalog.value || allMoviesCatalog.value.length === 0) {
+    fetchMovies()
+  } else {
+    fetchMovies() // Vérification en arrière-plan
+  }
+})
 
 // Calcul synchrone instantané des rôles du doubleur depuis le cache global
 const groupedRoles = computed(() => {
