@@ -9,8 +9,24 @@ const showResults = ref(false)
 const searchWrapper = ref(null)
 const isMenuOpen = ref(false)
 
-// Variable pour gérer l'affichage de l'écran de chargement initial
-const isInitialLoading = ref(true)
+// ÉTAPE CLÉ : Si le localStorage a déjà du cache, on désactive l'écran de chargement instantanément.
+// Sinon (première visite), on l'affiche le temps de télécharger.
+const isInitialLoading = ref(process.client ? !localStorage.getItem('vfq_movies_cache') : true)
+
+// Si on a déjà du cache au démarrage, on le charge tout de suite dans allData pour que tout s'affiche direct
+if (process.client) {
+  try {
+    const cachedData = localStorage.getItem('vfq_movies_cache')
+    if (cachedData) {
+      const parsed = JSON.parse(cachedData)
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        allData.value = parsed
+      }
+    }
+  } catch (e) {
+    console.error("Erreur de lecture du cache localStorage:", e)
+  }
+}
 
 const toggleMenu = () => { isMenuOpen.value = !isMenuOpen.value }
 const closeMenu = () => { isMenuOpen.value = false }
@@ -24,24 +40,7 @@ const handleClickOutside = (event) => {
 onMounted(async () => {
   window.addEventListener('click', handleClickOutside)
 
-  // 1. ÉTAPE CLÉ : On essaie de charger immédiatement depuis le localStorage du navigateur
-  if (process.client) {
-    try {
-      const cachedData = localStorage.getItem('vfq_movies_cache')
-      if (cachedData) {
-        const parsed = JSON.parse(cachedData)
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          allData.value = parsed
-          isInitialLoading.value = false // Affichage instantané !
-        }
-      }
-    } catch (e) {
-      console.error("Erreur de lecture du cache localStorage:", e)
-    }
-  }
-
-  // 2. Si on n'avait rien du tout en cache, on laisse l'écran de chargement actif.
-  // Sinon, si on avait déjà un cache, le site s'affiche direct et on fetch en arrière-plan discrètement.
+  // On télécharge la version la plus fraîche depuis Supabase en arrière-plan (en silence)
   try {
     let allRows = []
     let page = 0
@@ -78,7 +77,7 @@ onMounted(async () => {
   } catch (error) {
     console.error("Erreur de chargement Supabase:", error)
   } finally {
-    // On s'assure que l'écran de chargement initial se retire dans tous les cas
+    // Dans tous les cas, on s'assure que l'écran de chargement initial se retire
     isInitialLoading.value = false
   }
 })
@@ -179,7 +178,7 @@ const selectPerson = (name, type) => {
 </script>
 
 <template>
-  <!-- Écran de chargement global pendant la récupération initiale -->
+  <!-- Écran de chargement global (uniquement visible à la toute première visite) -->
   <div v-if="isInitialLoading" class="initial-loading-screen">
     <div class="loader-content">
       <div class="spinner"></div>
@@ -187,7 +186,7 @@ const selectPerson = (name, type) => {
     </div>
   </div>
 
-  <!-- Le site normal s'affiche une fois le chargement terminé -->
+  <!-- Le site normal s'affiche immédiatement si le cache existe -->
   <div id="layout" v-else>
     <nav class="nav">
       <div class="nav-content">
@@ -228,7 +227,6 @@ const selectPerson = (name, type) => {
               </div>
               <div v-if="liveResults.movies.length > 0" class="search-section">
                 <div class="section-label">Films & Séries</div>
-                <!-- Utilisation de movie.movie_id au lieu de movie.id -->
                 <div v-for="movie in liveResults.movies" :key="movie.movie_id" class="dropdown-item" @click="selectMovie(movie.movie_id)">
                   <img v-if="movie.poster_path" :src="getPosterUrl(movie.poster_path)" class="item-poster">
                   <div v-else class="item-poster-placeholder">VFQ</div>
