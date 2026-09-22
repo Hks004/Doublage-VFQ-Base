@@ -41,8 +41,14 @@ useHead(() => ({
 </script>
 
 <template>
-  <!-- S'affiche instantanément si le film est trouvé dans le catalogue -->
-  <div class="page-detail" v-if="movie">
+  <!-- 1. Priorité absolue au chargement : évite le flash "Film introuvable" -->
+  <div v-if="loading" class="loader">
+    <div class="spinner"></div>
+    <p>Chargement de la fiche...</p>
+  </div>
+
+  <!-- 2. S'affiche si le chargement est terminé et que le film est trouvé -->
+  <div class="page-detail" v-else-if="movie">
     <div class="nav-container">
       <a href="#" @click.prevent="goBack" class="back-link">← RETOUR</a>
     </div>
@@ -149,12 +155,8 @@ useHead(() => ({
       </div>
     </div>
   </div>
-  <!-- Chargement global ou de la fiche -->
-  <div v-else-if="loading" class="loader">
-    <div class="spinner"></div>
-    <p>Chargement de la fiche...</p>
-  </div>
-  <!-- Si le chargement est terminé mais que le film n'existe pas -->
+
+  <!-- 3. Si le chargement est terminé et que le film n'existe pas du tout -->
   <div v-else class="loader">
     <p>Film introuvable.</p>
   </div>

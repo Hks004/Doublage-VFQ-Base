@@ -162,6 +162,7 @@ import { ref, onMounted } from 'vue'
 
 const supabase = useSupabaseClient()
 const router = useRouter()
+const { fetchMovies } = useVfqMovies() // ⚡️ Import de la fonction de cache
 
 const submissions = ref([])
 const selectedSubmission = ref(null)
@@ -251,6 +252,9 @@ const publishSubmission = async (sub) => {
       ])
 
     if (insertError) throw insertError
+
+    // ⚡️ Force le rechargement immédiat du cache global des films
+    await fetchMovies(true)
 
     await deleteSubmission(sub.id, false)
     alert(`Film publié avec succès ! Attribué au movie_id : ${nextMovieId}`)
@@ -593,7 +597,7 @@ const formatDate = (dateString) => {
   color: #ef4444;
   border: 1px solid #444;
   height: 34px;
-  border-radius: 4px;
+  border-radius: 44px;
   cursor: pointer;
   font-weight: bold;
 }
@@ -656,7 +660,6 @@ const formatDate = (dateString) => {
     display: none;
   }
 
-  /* Si une soumission est sélectionnée sur mobile, on masque la liste et on affiche les détails en plein écran */
   .admin-layout.mobile-view-detail .submissions-list {
     display: none;
   }

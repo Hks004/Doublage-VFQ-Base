@@ -5,7 +5,10 @@ const router = useRouter()
 // 1. On récupère le catalogue global en mémoire via le composable centralisé
 const { allMovies: allMoviesCatalog, loading: directLoading, fetchMovies } = useVfqMovies()
 
-await fetchMovies()
+// Chargement non bloquant pour éviter l'écran noir (SSR safe)
+onMounted(() => {
+  fetchMovies()
+})
 
 // 2. Extraire les 5 derniers films triés par ID décroissant depuis le cache
 const derniersAjouts = computed(() => {

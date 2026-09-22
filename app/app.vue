@@ -1,16 +1,13 @@
 <script setup>
-const supabase = useSupabaseClient()
 const router = useRouter()
 
-// On utilise useState pour partager la liste des films globalement dans l'app
-const allData = useState('vfq_all_movies_comediens', () => [])
+// On récupère le cache et la fonction de chargement depuis ton composable
+const { movies: allData, isLoading: isInitialLoading, fetchMovies } = useVfqMovies()
+
 const searchQuery = ref('')
 const showResults = ref(false)
 const searchWrapper = ref(null)
 const isMenuOpen = ref(false)
-
-// L'écran de chargement s'affiche à chaque visite le temps de tout récupérer proprement
-const isInitialLoading = ref(true)
 
 const toggleMenu = () => { isMenuOpen.value = !isMenuOpen.value }
 const closeMenu = () => { isMenuOpen.value = false }
@@ -24,39 +21,8 @@ const handleClickOutside = (event) => {
 onMounted(async () => {
   window.addEventListener('click', handleClickOutside)
 
-  // Téléchargement propre depuis Supabase à chaque chargement de page
-  try {
-    let allRows = []
-    let page = 0
-    const pageSize = 2500
-    let fetchMore = true
-
-    while (fetchMore) {
-      const { data, error } = await supabase
-        .from('fiches_vfq')
-        .select('*')
-        .range(page * pageSize, (page + 1) * pageSize - 1)
-
-      if (error) throw error
-
-      if (data && data.length > 0) {
-        allRows = allRows.concat(data)
-        if (data.length < pageSize) {
-          fetchMore = false
-        } else {
-          page++
-        }
-      } else {
-        fetchMore = false
-      }
-    }
-
-    allData.value = allRows
-  } catch (error) {
-    console.error("Erreur de chargement Supabase:", error)
-  } finally {
-    isInitialLoading.value = false
-  }
+  // Lance le chargement intelligent (utilise le cache si dispo, ou vérifie les nouveautés en douce)
+  await fetchMovies()
 })
 
 onUnmounted(() => {
@@ -155,7 +121,7 @@ const selectPerson = (name, type) => {
 </script>
 
 <template>
-  <div v-if="isInitialLoading" class="initial-loading-screen">
+  <div v-if="isInitialLoading && (!allData || allData.length === 0)" class="initial-loading-screen">
     <div class="loader-content">
       <div class="spinner"></div>
       <p>🎬 Chargement de la base de données...</p>
