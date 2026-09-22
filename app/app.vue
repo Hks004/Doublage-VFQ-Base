@@ -2,6 +2,7 @@
 const supabase = useSupabaseClient()
 const router = useRouter()
 
+// On utilise useState pour partager la liste des films globalement dans l'app
 const allData = useState('vfq_all_movies_comediens', () => [])
 const searchQuery = ref('')
 const showResults = ref(false)
@@ -23,14 +24,25 @@ const handleClickOutside = (event) => {
 onMounted(async () => {
   window.addEventListener('click', handleClickOutside)
 
-  try {
-    // Si le useState est déjà rempli, on coupe direct le chargement
-    if (allData.value && allData.value.length > 0) {
-      isInitialLoading.value = false
-      return
+  // 1. ÉTAPE CLÉ : On essaie de charger immédiatement depuis le localStorage du navigateur
+  if (process.client) {
+    try {
+      const cachedData = localStorage.getItem('vfq_movies_cache')
+      if (cachedData) {
+        const parsed = JSON.parse(cachedData)
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          allData.value = parsed
+          isInitialLoading.value = false // Affichage instantané !
+        }
+      }
+    } catch (e) {
+      console.error("Erreur de lecture du cache localStorage:", e)
     }
+  }
 
-    // On télécharge la base complète en arrière-plan
+  // 2. Si on n'avait rien du tout en cache, on laisse l'écran de chargement actif.
+  // Sinon, si on avait déjà un cache, le site s'affiche direct et on fetch en arrière-plan discrètement.
+  try {
     let allRows = []
     let page = 0
     const pageSize = 1000
@@ -56,11 +68,17 @@ onMounted(async () => {
       }
     }
 
-    allData.value = allRows
+    if (allRows.length > 0) {
+      allData.value = allRows
+      // On met à jour le localStorage pour la prochaine visite
+      if (process.client) {
+        localStorage.setItem('vfq_movies_cache', JSON.stringify(allRows))
+      }
+    }
   } catch (error) {
     console.error("Erreur de chargement Supabase:", error)
   } finally {
-    // Dans tous les cas (succès ou erreur), on retire l'écran de chargement
+    // On s'assure que l'écran de chargement initial se retire dans tous les cas
     isInitialLoading.value = false
   }
 })
