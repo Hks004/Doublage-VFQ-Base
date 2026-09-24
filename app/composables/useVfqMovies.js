@@ -60,7 +60,7 @@ export const useVfqMovies = () => {
       }
     }
 
-    // 2. Vérification TTL (30 minutes) + vérification updated_at ultra-légère vers Supabase
+    // 2. Vérification TTL (30 minutes) + synchronisation chirurgicale
     if (!forceRefresh && hasLoaded.value && movies.value.length > 0 && process.client) {
       const lastCheck = localStorage.getItem('vfq_vfq_last_check')
       const now = Date.now()
@@ -72,7 +72,7 @@ export const useVfqMovies = () => {
       }
 
       try {
-        // On récupère uniquement le updated_at le plus récent de toute la table
+        // On récupère le updated_at le plus récent de la table
         const { data, error } = await supabase
           .from('fiches_vfq')
           .select('updated_at')
@@ -83,21 +83,48 @@ export const useVfqMovies = () => {
           const latestServerUpdate = data[0].updated_at
           const cachedServerUpdate = localStorage.getItem('vfq_last_updated_at')
 
-          // Si la date sur le serveur est identique, le cache est bon !
+          // Si la date serveur est identique, le cache est 100% valide (0 Mo téléchargé)
           if (cachedServerUpdate && cachedServerUpdate === latestServerUpdate) {
             localStorage.setItem('vfq_vfq_last_check', now.toString())
-            return // Cache validé, 0 Mo téléchargé !
-          } else {
-            // Si la date a bougé (modification de texte), on met à jour la référence
-            localStorage.setItem('vfq_last_updated_at', latestServerUpdate)
-            localStorage.setItem('vfq_vfq_last_check', now.toString())
+            return 
           }
+
+          // SINON : Des modifications ont eu lieu ! On fait une mise à jour chirurgicale.
+          // Au lieu de tout re-télécharger, on va chercher UNIQUEMENT les fiches modifiées depuis notre dernière ref.
+          const lastSyncTime = localStorage.getItem('vfq_last_sync_timestamp') || '1970-01-01T00:00:00.000Z'
+          
+          const { data: updatedRows, error: updateError } = await supabase
+            .from('fiches_vfq')
+            .select('*')
+            .gt('updated_at', lastSyncTime)
+
+          if (!updateError && updatedRows && updatedRows.length > 0) {
+            // On met à jour ou ajoute les fiches modifiées directement dans notre tableau en mémoire
+            const movieMap = new Map(movies.value.map(m => [m.id, m])) // Assure-toi que ton ID s'appelle bien 'id', ajuste si c'est 'id_fiche' par exemple
+            
+            updatedRows.forEach(row => {
+              movieMap.set(row.id, row) // Remplace l'ancienne version par la nouvelle
+            })
+
+            movies.value = Array.from(movieMap.values())
+
+            // On sauvegarde le nouveau tableau propre dans l'IndexedDB
+            await setToIDB('vfq_movies_data', movies.value)
+          }
+
+          // On met à jour les repères temporels
+          localStorage.setItem('vfq_last_updated_at', latestServerUpdate)
+          localStorage.setItem('vfq_last_sync_timestamp', new Date().toISOString())
+          localStorage.setItem('vfq_vfq_last_check', now.toString())
+          return // Fin du processus chirurgical, egress minimaliste !
         }
       } catch (e) {
-        return 
+        console.error("Erreur lors de la sync chirurgicale :", e)
+        // En cas de pépin, on laisse passer vers le chargement complet de secours
       }
     }
 
+    // 3. Téléchargement complet initial (si l'IndexedDB était totalement vide)
     isLoading.value = true
     let allRows = []
     let page = 0
@@ -128,12 +155,12 @@ export const useVfqMovies = () => {
       movies.value = allRows
       hasLoaded.value = true
 
-      // 3. Sauvegarde dans IndexedDB, actualisation du TTL et de la date de référence
+      // Sauvegarde initiale dans IndexedDB et marquage des repères
       if (process.client) {
         await setToIDB('vfq_movies_data', allRows)
         localStorage.setItem('vfq_vfq_last_check', Date.now().toString())
+        localStorage.setItem('vfq_last_sync_timestamp', new Date().toISOString())
 
-        // On enregistre la dernière date serveur actuelle
         const { data: latestData } = await supabase
           .from('fiches_vfq')
           .select('updated_at')
