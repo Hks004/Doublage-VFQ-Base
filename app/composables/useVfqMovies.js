@@ -60,7 +60,7 @@ export const useVfqMovies = () => {
       }
     }
 
-    // 2. Vérification TTL (30 minutes) + HEAD ultra-légère vers Supabase
+    // 2. Vérification TTL (30 minutes) + vérification updated_at ultra-légère vers Supabase
     if (!forceRefresh && hasLoaded.value && movies.value.length > 0 && process.client) {
       const lastCheck = localStorage.getItem('vfq_vfq_last_check')
       const now = Date.now()
@@ -72,18 +72,26 @@ export const useVfqMovies = () => {
       }
 
       try {
-        const { count, error } = await supabase
+        // On récupère uniquement le updated_at le plus récent de toute la table
+        const { data, error } = await supabase
           .from('fiches_vfq')
-          .select('*', { count: 'exact', head: true })
+          .select('updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(1)
 
-        if (!error && count === movies.value.length) {
-          // On met à jour le timestamp de la dernière vérification réussie
-          localStorage.setItem('vfq_vfq_last_check', now.toString())
-          return // Cache validé, 0 Mo téléchargé !
-        } else if (!error) {
-          // Si le nombre de lignes a changé, on met à jour le timestamp 
-          // et on laisse le code continuer pour re-télécharger le catalogue frais.
-          localStorage.setItem('vfq_vfq_last_check', now.toString())
+        if (!error && data && data.length > 0) {
+          const latestServerUpdate = data[0].updated_at
+          const cachedServerUpdate = localStorage.getItem('vfq_last_updated_at')
+
+          // Si la date sur le serveur est identique, le cache est bon !
+          if (cachedServerUpdate && cachedServerUpdate === latestServerUpdate) {
+            localStorage.setItem('vfq_vfq_last_check', now.toString())
+            return // Cache validé, 0 Mo téléchargé !
+          } else {
+            // Si la date a bougé (modification de texte), on met à jour la référence
+            localStorage.setItem('vfq_last_updated_at', latestServerUpdate)
+            localStorage.setItem('vfq_vfq_last_check', now.toString())
+          }
         }
       } catch (e) {
         return 
@@ -120,10 +128,21 @@ export const useVfqMovies = () => {
       movies.value = allRows
       hasLoaded.value = true
 
-      // 3. Sauvegarde dans IndexedDB et actualisation du TTL
+      // 3. Sauvegarde dans IndexedDB, actualisation du TTL et de la date de référence
       if (process.client) {
         await setToIDB('vfq_movies_data', allRows)
         localStorage.setItem('vfq_vfq_last_check', Date.now().toString())
+
+        // On enregistre la dernière date serveur actuelle
+        const { data: latestData } = await supabase
+          .from('fiches_vfq')
+          .select('updated_at')
+          .order('updated_at', { ascending: false })
+          .limit(1)
+        
+        if (latestData && latestData.length > 0) {
+          localStorage.setItem('vfq_last_updated_at', latestData[0].updated_at)
+        }
       }
 
     } catch (err) {
